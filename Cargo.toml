@@ -1,6 +1,7 @@
 [package]
+authors = ["Ceri Storey <cez@necrofish.org.uk>"]
 name = "suppositions"
 version = "0.1.0"
-authors = ["Ceri Storey <cez@necrofish.org.uk>"]
 
 [dependencies]
+rand = "0.3.16"
