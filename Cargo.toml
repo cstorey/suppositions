@@ -1,0 +1,6 @@
+[package]
+name = "suppositions"
+version = "0.1.0"
+authors = ["Ceri Storey <cez@necrofish.org.uk>"]
+
+[dependencies]
