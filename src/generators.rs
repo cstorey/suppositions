@@ -45,7 +45,7 @@ mod tests {
     use std::iter;
     use super::*;
     use data::InfoPool;
-    const SHORT_VEC_SIZE : usize = 64;
+    const SHORT_VEC_SIZE: usize = 64;
 
     fn gen_random_vec() -> Vec<u8> {
         (0..SHORT_VEC_SIZE).map(|_| random()).collect::<Vec<u8>>()
@@ -105,6 +105,18 @@ mod tests {
     }
 
     #[test]
+    fn bools_minimize_to_false() {
+        let gen = booleans();
+        let p = InfoPool::random_of_size(4);
+        println!("Before: {:?}", p);
+        let p = minimize(&p, &|mut t| gen.generate(&mut t).is_ok()).unwrap_or(p);
+        println!("After: {:?}", p);
+
+        let val = gen.generate(&mut p.tap()).expect("generated value");
+        assert_eq!(val, false);
+    }
+
+    #[test]
     fn vecs_should_generate_same_output_given_same_input() {
         let gen = vecs(booleans());
         for (p0, p1, v0, v1) in iter::repeat(())
@@ -138,5 +150,37 @@ mod tests {
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .count();
         assert!(differing > 0, "Differing items:{} > 0", differing);
+    }
+
+    #[test]
+    fn vec_bools_minimize_to_empty() {
+        let gen = vecs(booleans());
+        let p = InfoPool::random_of_size(4);
+        println!("Before: {:?}", p);
+        let p = minimize(&p, &|mut t| gen.generate(&mut t).is_ok()).unwrap_or(p);
+        println!("After: {:?}", p);
+
+        let val = gen.generate(&mut p.tap()).expect("generated value");
+        assert_eq!(val, vec![]);
+    }
+
+    #[test]
+    fn vec_bools_can_minimise_with_predicate() {
+        let gen = vecs(booleans());
+        let mut p = InfoPool::random_of_size(SHORT_VEC_SIZE);
+        while !gen.generate(&mut p.tap()).map(|v| v.len() > 2).unwrap_or(
+            false,
+        )
+        {
+            p = InfoPool::random_of_size(SHORT_VEC_SIZE);
+        }
+        println!("Before: {:?}", p);
+        let p = minimize(&p, &|mut t| {
+            gen.generate(&mut t).map(|v| v.len() > 2).unwrap_or(false)
+        }).unwrap_or(p);
+        println!("After: {:?}", p);
+
+        let val = gen.generate(&mut p.tap()).expect("generated value");
+        assert_eq!(val, vec![false, false, false]);
     }
 }
