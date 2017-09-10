@@ -36,11 +36,13 @@ impl InfoPool {
         self.off += 1;
         res.ok_or(PoolExhausted)
     }
+    pub fn reset(&mut self) {
+        self.off = 0
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use rand::random;
     use super::*;
 
     #[test]
@@ -57,9 +59,28 @@ mod tests {
     fn should_generate_random_data_of_size() {
         let size = 100;
         let mut p = InfoPool::random_of_size(size);
-        for _ in (0..size) {
+        for _ in 0..size {
             assert!(p.next_byte().is_ok());
         }
         assert!(p.next_byte().is_err());
     }
+
+    #[test]
+    fn should_allow_restarting_read() {
+        let mut p = InfoPool::random_of_size(4);
+        let mut v0 = Vec::new();
+        while let Ok(val) = p.next_byte() {
+            v0.push(val)
+        }
+
+        p.reset();
+        let mut v1 = Vec::new();
+        while let Ok(val) = p.next_byte() {
+            v1.push(val)
+        }
+
+        assert_eq!(v0, v1)
+    }
+
+
 }

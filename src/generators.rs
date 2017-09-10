@@ -43,7 +43,6 @@ impl BoolGenerator {}
 mod tests {
     use rand::random;
     use std::iter;
-    use std::collections::*;
     use super::*;
     use data::InfoPool;
 
