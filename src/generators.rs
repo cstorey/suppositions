@@ -45,9 +45,10 @@ mod tests {
     use std::iter;
     use super::*;
     use data::InfoPool;
+    const SHORT_VEC_SIZE : usize = 64;
 
-    fn gen_random_vec(size: usize) -> Vec<u8> {
-        (0..size).map(|_| random()).collect::<Vec<u8>>()
+    fn gen_random_vec() -> Vec<u8> {
+        (0..SHORT_VEC_SIZE).map(|_| random()).collect::<Vec<u8>>()
     }
 
     // If only I had some kind of property testing library.
@@ -69,7 +70,7 @@ mod tests {
     fn bools_should_generate_same_output_given_same_input() {
         let gen = booleans();
         for (p0, p1, v0, v1) in iter::repeat(())
-            .map(|_| gen_random_vec(16))
+            .map(|_| gen_random_vec())
             .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
             .flat_map(|(p0, p1)| {
                 gen.generate(&mut p0.tap()).and_then(|v0| {
@@ -89,7 +90,7 @@ mod tests {
         let gen = booleans();
         let nitems = 100;
         let differing = iter::repeat(())
-            .map(|_| (gen_random_vec(16), gen_random_vec(1024)))
+            .map(|_| (gen_random_vec(), gen_random_vec()))
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
             .flat_map(|(p0, p1)| {
@@ -107,7 +108,7 @@ mod tests {
     fn vecs_should_generate_same_output_given_same_input() {
         let gen = vecs(booleans());
         for (p0, p1, v0, v1) in iter::repeat(())
-            .map(|_| gen_random_vec(16))
+            .map(|_| gen_random_vec())
             .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
             .flat_map(|(p0, p1)| {
                 gen.generate(&mut p0.tap()).and_then(|v0| {
@@ -125,7 +126,7 @@ mod tests {
         let gen = vecs(booleans());
         let nitems = 100;
         let differing = iter::repeat(())
-            .map(|_| (gen_random_vec(16), gen_random_vec(1024)))
+            .map(|_| (gen_random_vec(), gen_random_vec()))
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
             .flat_map(|(p0, p1)| {
