@@ -7,7 +7,7 @@ pub struct VecGenerator<G>(G);
 
 pub trait Generator {
     type Item;
-    fn generate(&self, source: &mut InfoPool) -> Maybe<Self::Item>;
+    fn generate(&self, source: &mut InfoTap) -> Maybe<Self::Item>;
 }
 
 pub fn booleans() -> BoolGenerator {
@@ -19,7 +19,7 @@ pub fn vecs<G>(inner: G) -> VecGenerator<G> {
 
 impl<G: Generator> Generator for VecGenerator<G> {
     type Item = Vec<G::Item>;
-    fn generate(&self, src: &mut InfoPool) -> Maybe<Self::Item> {
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
         let mut result = Vec::new();
         let bs = booleans();
         while bs.generate(src)? {
@@ -32,7 +32,7 @@ impl<G: Generator> Generator for VecGenerator<G> {
 }
 impl Generator for BoolGenerator {
     type Item = bool;
-    fn generate(&self, src: &mut InfoPool) -> Maybe<Self::Item> {
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
         src.next_byte().map(|next| next >= 0x80)
     }
 }
@@ -55,13 +55,13 @@ mod tests {
     fn bools_should_generate_false_booleans_from_zeros() {
         let v1 = vec![0];
         let bools = booleans();
-        assert_eq!(bools.generate(&mut InfoPool::of_vec(v1)), Ok(false));
+        assert_eq!(bools.generate(&mut InfoPool::of_vec(v1).tap()), Ok(false));
     }
     #[test]
     fn bools_should_generate_true_booleans_from_saturated_values() {
         let v1 = vec![0xff];
         let bools = booleans();
-        assert_eq!(bools.generate(&mut InfoPool::of_vec(v1)), Ok(true));
+        assert_eq!(bools.generate(&mut InfoPool::of_vec(v1).tap()), Ok(true));
     }
 
     #[test]
@@ -70,9 +70,9 @@ mod tests {
         for (p0, p1, v0, v1) in iter::repeat(())
             .map(|_| gen_random_vec(16))
             .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
-            .flat_map(|(mut p0, mut p1)| {
-                gen.generate(&mut p0).and_then(|v0| {
-                    gen.generate(&mut p1).map(|v1| (p0, p1, v0, v1))
+            .flat_map(|(p0, p1)| {
+                gen.generate(&mut p0.tap()).and_then(|v0| {
+                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
                 })
             })
             .take(100)
@@ -91,9 +91,9 @@ mod tests {
             .map(|_| (gen_random_vec(16), gen_random_vec(1024)))
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
-            .flat_map(|(mut p0, mut p1)| {
-                gen.generate(&mut p0).and_then(|v0| {
-                    gen.generate(&mut p1).map(|v1| (v0, v1))
+            .flat_map(|(p0, p1)| {
+                gen.generate(&mut p0.tap()).and_then(|v0| {
+                    gen.generate(&mut p1.tap()).map(|v1| (v0, v1))
                 })
             })
             .take(nitems)
@@ -108,9 +108,9 @@ mod tests {
         for (p0, p1, v0, v1) in iter::repeat(())
             .map(|_| gen_random_vec(16))
             .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
-            .flat_map(|(mut p0, mut p1)| {
-                gen.generate(&mut p0).and_then(|v0| {
-                    gen.generate(&mut p1).map(|v1| (p0, p1, v0, v1))
+            .flat_map(|(p0, p1)| {
+                gen.generate(&mut p0.tap()).and_then(|v0| {
+                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
                 })
             })
             .take(100)
@@ -127,9 +127,9 @@ mod tests {
             .map(|_| (gen_random_vec(16), gen_random_vec(1024)))
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
-            .flat_map(|(mut p0, mut p1)| {
-                gen.generate(&mut p0).and_then(|v0| {
-                    gen.generate(&mut p1).map(|v1| (v0, v1))
+            .flat_map(|(p0, p1)| {
+                gen.generate(&mut p0.tap()).and_then(|v0| {
+                    gen.generate(&mut p1.tap()).map(|v1| (v0, v1))
                 })
             })
             .take(nitems)

@@ -26,14 +26,13 @@ where
 {
     pub fn check<F: Fn(G::Item) -> bool>(self, check: F) {
         for _i in 0..NUM_TESTS {
-            let mut pool = InfoPool::random_of_size(DEFAULT_POOL_SIZE);
-            if let Ok(arg) = self.gen.generate(&mut pool) {
+            let pool = InfoPool::random_of_size(DEFAULT_POOL_SIZE);
+            if let Ok(arg) = self.gen.generate(&mut pool.tap()) {
                 let res = check(arg);
-                pool.reset();
                 assert!(
                     res,
                     "Predicate failed for argument {:?}",
-                    self.gen.generate(&mut pool)
+                    self.gen.generate(&mut pool.tap())
                 )
             } else {
                 println!("Not enough pool")
