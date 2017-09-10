@@ -99,7 +99,7 @@ fn minimize_via_scalar_shrink<F: Fn(InfoTap) -> bool>(
     for i in 0..p.data.len() {
         candidate.clone_from(&p);
 
-        for bitoff in 1..8 {
+        for bitoff in 0..8 {
             candidate.data[i] = p.data[i] - (p.data[i] >> bitoff);
             println!(
                 "shrunk item -(bitoff:{}) {} {}->{}: {:?}",
@@ -226,6 +226,13 @@ mod tests {
         let min = minimize(&p, &|mut t| t.any(|v| v >= 3)).expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[3])
+    }
+    #[test]
+    fn minimiser_should_minimise_scalar_values_to_zero() {
+        let p = InfoPool::of_vec(vec![255; 3]);
+        let min = minimize(&p, &|mut t| t.any(|_| true)).expect("some smaller pool");
+
+        assert_eq!(min.buffer(), &[0])
     }
 
     #[test]
