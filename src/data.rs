@@ -63,12 +63,13 @@ impl<'a> Iterator for InfoTap<'a> {
     }
 }
 
-pub fn minimize<F: Fn(InfoTap) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
-    // Naive strategy by removing slices.
-    let mut candidate = p.clone();
-    println!("minimizing by removal: {:?}", p);
-
+fn minimize_via_removal<F: Fn(InfoTap) -> bool>(
+    p: &InfoPool,
+    candidate: &mut InfoPool,
+    pred: &F,
+) -> Option<InfoPool> {
     // First shrink tactic: item removal
+    println!("minimizing by removal: {:?}", p);
     for i in 0..p.data.len() {
         candidate.clone_from(&p);
         candidate.data.remove(i);
@@ -81,13 +82,19 @@ pub fn minimize<F: Fn(InfoTap) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPo
                 return Some(res);
             } else {
                 println!("Returning original: {:?}", candidate);
-                return Some(candidate);
+                return Some(candidate.clone());
             }
         }
     }
+    None
+}
 
+fn minimize_via_scalar_shrink<F: Fn(InfoTap) -> bool>(
+    p: &InfoPool,
+    candidate: &mut InfoPool,
+    pred: &F,
+) -> Option<InfoPool> {
     // Second shrink tactic: make values smaller
-
     println!("minimizing by scalar shrink: {:?}", p);
     for i in 0..p.data.len() {
         candidate.clone_from(&p);
@@ -116,11 +123,23 @@ pub fn minimize<F: Fn(InfoTap) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPo
                     return Some(res);
                 } else {
                     println!("Returning original: {:?}", candidate);
-                    return Some(candidate);
+                    return Some(candidate.clone());
                 }
             }
-            // TODO: OVERFLOW?
         }
+    }
+
+    None
+}
+
+pub fn minimize<F: Fn(InfoTap) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
+    let mut candidate = p.clone();
+    if let Some(res) = minimize_via_removal(p, &mut candidate, pred) {
+        return Some(res);
+    }
+
+    if let Some(res) = minimize_via_scalar_shrink(p, &mut candidate, pred) {
+        return Some(res);
     }
 
     println!("Nothing smaller found than {:?}", p);
