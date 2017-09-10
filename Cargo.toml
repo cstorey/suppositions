@@ -4,4 +4,5 @@ name = "suppositions"
 version = "0.1.0"
 
 [dependencies]
+hex-slice = "0.1.0"
 rand = "0.3.16"
