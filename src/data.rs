@@ -70,19 +70,33 @@ fn minimize_via_removal<F: Fn(InfoTap) -> bool>(
 ) -> Option<InfoPool> {
     // First shrink tactic: item removal
     println!("minimizing by removal: {:?}", p);
-    for i in 0..p.data.len() {
-        candidate.clone_from(&p);
-        candidate.data.remove(i);
+    let max_pow = 0usize.count_zeros();
+    let pow = max_pow - p.data.len().leading_zeros();
+    for granularity in 0..pow {
+        let width = p.data.len() >> granularity;
+        for chunk in 0..(1 << granularity) {
+            let start = chunk * width;
+            let end = start + width;
+            candidate.data.clear();
+            candidate.data.extend(&p.data[0..start]);
+            candidate.data.extend(&p.data[end..]);
 
-        let test = pred(candidate.tap());
-        println!("removed {}: {:?}; test result {}", i, candidate, test);
-        if test {
-            if let Some(res) = minimize(&candidate, pred) {
-                println!("Returning shrunk: {:?}", res);
-                return Some(res);
-            } else {
-                println!("Returning original: {:?}", candidate);
-                return Some(candidate.clone());
+            let test = pred(candidate.tap());
+            println!(
+                "removed {},{}: {:?}; test result {}",
+                start,
+                end,
+                candidate,
+                test
+            );
+            if test {
+                if let Some(res) = minimize(&candidate, pred) {
+                    println!("Returning shrunk: {:?}", res);
+                    return Some(res);
+                } else {
+                    println!("Returning original: {:?}", candidate);
+                    return Some(candidate.clone());
+                }
             }
         }
     }
