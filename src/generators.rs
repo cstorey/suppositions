@@ -57,6 +57,7 @@ mod tests {
         let bools = booleans();
         assert_eq!(bools.generate(&mut InfoPool::of_vec(v1).tap()), Ok(false));
     }
+
     #[test]
     fn bools_should_generate_true_booleans_from_saturated_values() {
         let v1 = vec![0xff];

@@ -35,9 +35,16 @@ impl InfoPool {
         Self::of_vec((0..size).map(|_| random()).collect::<Vec<u8>>())
     }
 
+    pub fn buffer(&self) -> &[u8] {
+        &*self.data
+    }
+
     pub fn tap(&self) -> InfoTap {
-        InfoTap { data: &*self.data, off: 0 }
-    } 
+        InfoTap {
+            data: &*self.data,
+            off: 0,
+        }
+    }
 }
 
 impl<'a> InfoTap<'a> {
@@ -46,7 +53,78 @@ impl<'a> InfoTap<'a> {
         self.off += 1;
         res.ok_or(PoolExhausted)
     }
+}
 
+
+impl<'a> Iterator for InfoTap<'a> {
+    type Item = u8;
+    fn next(&mut self) -> Option<u8> {
+        self.next_byte().ok()
+    }
+}
+
+pub fn minimize<F: Fn(InfoTap) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
+    // Naive strategy by removing slices.
+    let mut candidate = p.clone();
+    println!("minimizing by removal: {:?}", p);
+
+    // First shrink tactic: item removal
+    for i in 0..p.data.len() {
+        candidate.clone_from(&p);
+        candidate.data.remove(i);
+
+        let test = pred(candidate.tap());
+        println!("removed {}: {:?}; test result {}", i, candidate, test);
+        if test {
+            if let Some(res) = minimize(&candidate, pred) {
+                println!("Returning shrunk: {:?}", res);
+                return Some(res);
+            } else {
+                println!("Returning original: {:?}", candidate);
+                return Some(candidate);
+            }
+        }
+    }
+
+    // Second shrink tactic: make values smaller
+
+    println!("minimizing by scalar shrink: {:?}", p);
+    for i in 0..p.data.len() {
+        candidate.clone_from(&p);
+
+        for bitoff in 1..8 {
+            candidate.data[i] = p.data[i] - (p.data[i] >> bitoff);
+            println!(
+                "shrunk item -(bitoff:{}) {} {}->{}: {:?}",
+                bitoff,
+                i,
+                p.data[i],
+                candidate.data[i],
+                candidate
+            );
+
+            if candidate.buffer() == p.buffer() {
+                println!("No change");
+                continue;
+            }
+
+            let test = pred(candidate.tap());
+            println!("test result {}", test);
+            if test {
+                if let Some(res) = minimize(&candidate, pred) {
+                    println!("Returning shrunk: {:?}", res);
+                    return Some(res);
+                } else {
+                    println!("Returning original: {:?}", candidate);
+                    return Some(candidate);
+                }
+            }
+            // TODO: OVERFLOW?
+        }
+    }
+
+    println!("Nothing smaller found than {:?}", p);
+    None
 }
 
 #[cfg(test)]
@@ -93,5 +171,56 @@ mod tests {
         assert_eq!(v0, v1)
     }
 
+    #[test]
+    fn should_allow_borrowing_buffer() {
+        let p = InfoPool::of_vec(vec![1]);
+        assert_eq!(p.buffer(), &[1]);
+    }
 
+    #[test]
+    fn tap_can_act_as_iterator() {
+        let buf = vec![4, 3, 2, 1];
+        let p = InfoPool::of_vec(buf.clone());
+        let _: &Iterator<Item = u8> = &p.tap();
+
+        assert_eq!(p.tap().collect::<Vec<_>>(), buf)
+    }
+    #[test]
+    fn minimiser_should_minimise_to_empty() {
+        let p = InfoPool::of_vec(vec![1]);
+        let min = minimize(&p, &|_| true);
+
+        assert_eq!(min.as_ref().map(|p| p.buffer()), Some([].as_ref()))
+    }
+
+    #[test]
+    fn minimiser_should_minimise_to_minimum_given_size() {
+        let p = InfoPool::of_vec(vec![0; 4]);
+        let min = minimize(&p, &|t| t.count() > 1).expect("some smaller pool");
+
+        assert_eq!(min.buffer(), &[0, 0])
+    }
+
+    #[test]
+    fn minimiser_should_minimise_scalar_values() {
+        let p = InfoPool::of_vec(vec![255; 3]);
+        let min = minimize(&p, &|mut t| t.any(|v| v >= 3)).expect("some smaller pool");
+
+        assert_eq!(min.buffer(), &[3])
+    }
+
+    #[test]
+    fn minimiser_should_minimise_scalar_values_by_search() {
+        let p = InfoPool::of_vec(vec![255; 3]);
+        let min = minimize(&p, &|mut t| t.any(|v| v >= 13)).expect("some smaller pool");
+
+        assert_eq!(min.buffer(), &[13])
+    }
+    #[test]
+    fn minimiser_should_minimise_scalar_values_accounting_for_overflow() {
+        let p = InfoPool::of_vec(vec![255; 3]);
+        let min = minimize(&p, &|mut t| t.any(|v| v >= 251)).expect("some smaller pool");
+
+        assert_eq!(min.buffer(), &[251])
+    }
 }
