@@ -31,11 +31,14 @@ where
             let pool = InfoPool::random_of_size(DEFAULT_POOL_SIZE);
             if let Ok(arg) = self.gen.generate(&mut pool.tap()) {
                 let res = check(arg);
-                assert!(
-                    res,
-                    "Predicate failed for argument {:?}",
-                    self.gen.generate(&mut pool.tap())
-                )
+                if !res {
+                    let minpool = find_minimal(&self.gen, pool, |v| !check(v));
+                    assert!(
+                        false,
+                        "Predicate failed for argument {:?}",
+                        self.gen.generate(&mut minpool.tap())
+                    )
+                }
             } else {
                 println!("Not enough pool")
             }

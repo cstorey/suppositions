@@ -37,10 +37,16 @@ impl Generator for BoolGenerator {
     }
 }
 
-impl BoolGenerator {}
+pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(gen: &G, pool: InfoPool, check: F) -> InfoPool {
+    minimize(&pool, &|mut t| {
+        gen.generate(&mut t).map(|v| check(v)).unwrap_or(false)
+    }).unwrap_or(pool)
+}
+
 
 #[cfg(test)]
 mod tests {
+    extern crate env_logger;
     use rand::random;
     use std::iter;
     use super::*;
@@ -109,7 +115,7 @@ mod tests {
         let gen = booleans();
         let p = InfoPool::random_of_size(4);
         debug!("Before: {:?}", p);
-        let p = minimize(&p, &|mut t| gen.generate(&mut t).is_ok()).unwrap_or(p);
+        let p = find_minimal(&gen, p, |_| true);
         debug!("After: {:?}", p);
 
         let val = gen.generate(&mut p.tap()).expect("generated value");
@@ -154,10 +160,11 @@ mod tests {
 
     #[test]
     fn vec_bools_minimize_to_empty() {
+        env_logger::init().unwrap_or(());
         let gen = vecs(booleans());
-        let p = InfoPool::random_of_size(4);
+        let p = InfoPool::random_of_size(SHORT_VEC_SIZE);
         debug!("Before: {:?}", p);
-        let p = minimize(&p, &|mut t| gen.generate(&mut t).is_ok()).unwrap_or(p);
+        let p = find_minimal(&gen, p, |v| {info!("Check: {:?}", v); true});
         debug!("After: {:?}", p);
 
         let val = gen.generate(&mut p.tap()).expect("generated value");
@@ -175,9 +182,7 @@ mod tests {
             p = InfoPool::random_of_size(SHORT_VEC_SIZE);
         }
         debug!("Before: {:?}", p);
-        let p = minimize(&p, &|mut t| {
-            gen.generate(&mut t).map(|v| v.len() > 2).unwrap_or(false)
-        }).unwrap_or(p);
+        let p = find_minimal(&gen, p, |v| v.len() > 2);
         debug!("After: {:?}", p);
 
         let val = gen.generate(&mut p.tap()).expect("generated value");
