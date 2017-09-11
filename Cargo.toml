@@ -2,8 +2,8 @@
 authors = ["Ceri Storey <cez@necrofish.org.uk>"]
 name = "suppositions"
 version = "0.1.0"
-# Not yet agreed.
-# license = "???"
+license = "Apache-2.0"
+
 
 [dependencies]
 hex-slice = "0.1.0"

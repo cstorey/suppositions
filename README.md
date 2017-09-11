@@ -17,3 +17,6 @@ This also means that the shrunk values from your first failing test will fulfil 
 ## Integrated shrinking.
 
 This essentially falls out of the above. Because generation is done from an underlying format; we don't need to re-implement shrinking for each individual type.
+
+---
+Copyright 2017 Ceri Storey, Oliver Wyman.
