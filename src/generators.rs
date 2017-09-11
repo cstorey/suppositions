@@ -108,9 +108,9 @@ mod tests {
     fn bools_minimize_to_false() {
         let gen = booleans();
         let p = InfoPool::random_of_size(4);
-        println!("Before: {:?}", p);
+        debug!("Before: {:?}", p);
         let p = minimize(&p, &|mut t| gen.generate(&mut t).is_ok()).unwrap_or(p);
-        println!("After: {:?}", p);
+        debug!("After: {:?}", p);
 
         let val = gen.generate(&mut p.tap()).expect("generated value");
         assert_eq!(val, false);
@@ -156,9 +156,9 @@ mod tests {
     fn vec_bools_minimize_to_empty() {
         let gen = vecs(booleans());
         let p = InfoPool::random_of_size(4);
-        println!("Before: {:?}", p);
+        debug!("Before: {:?}", p);
         let p = minimize(&p, &|mut t| gen.generate(&mut t).is_ok()).unwrap_or(p);
-        println!("After: {:?}", p);
+        debug!("After: {:?}", p);
 
         let val = gen.generate(&mut p.tap()).expect("generated value");
         assert_eq!(val, vec![]);
@@ -174,11 +174,11 @@ mod tests {
         {
             p = InfoPool::random_of_size(SHORT_VEC_SIZE);
         }
-        println!("Before: {:?}", p);
+        debug!("Before: {:?}", p);
         let p = minimize(&p, &|mut t| {
             gen.generate(&mut t).map(|v| v.len() > 2).unwrap_or(false)
         }).unwrap_or(p);
-        println!("After: {:?}", p);
+        debug!("After: {:?}", p);
 
         let val = gen.generate(&mut p.tap()).expect("generated value");
         assert_eq!(val, vec![false, false, false]);

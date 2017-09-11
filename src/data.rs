@@ -69,7 +69,7 @@ fn minimize_via_removal<F: Fn(InfoTap) -> bool>(
     pred: &F,
 ) -> Option<InfoPool> {
     // First shrink tactic: item removal
-    println!("minimizing by removal: {:?}", p);
+    trace!("minimizing by removal: {:?}", p);
     let max_pow = 0usize.count_zeros();
     let pow = max_pow - p.data.len().leading_zeros();
     for granularity in 0..pow {
@@ -82,7 +82,7 @@ fn minimize_via_removal<F: Fn(InfoTap) -> bool>(
             candidate.data.extend(&p.data[end..]);
 
             let test = pred(candidate.tap());
-            println!(
+            trace!(
                 "removed {},{}: {:?}; test result {}",
                 start,
                 end,
@@ -91,10 +91,10 @@ fn minimize_via_removal<F: Fn(InfoTap) -> bool>(
             );
             if test {
                 if let Some(res) = minimize(&candidate, pred) {
-                    println!("Returning shrunk: {:?}", res);
+                    trace!("Returning shrunk: {:?}", res);
                     return Some(res);
                 } else {
-                    println!("Returning original: {:?}", candidate);
+                    trace!("Returning original: {:?}", candidate);
                     return Some(candidate.clone());
                 }
             }
@@ -109,13 +109,13 @@ fn minimize_via_scalar_shrink<F: Fn(InfoTap) -> bool>(
     pred: &F,
 ) -> Option<InfoPool> {
     // Second shrink tactic: make values smaller
-    println!("minimizing by scalar shrink: {:?}", p);
+    trace!("minimizing by scalar shrink: {:?}", p);
     for i in 0..p.data.len() {
         candidate.clone_from(&p);
 
         for bitoff in 0..8 {
             candidate.data[i] = p.data[i] - (p.data[i] >> bitoff);
-            println!(
+            trace!(
                 "shrunk item -(bitoff:{}) {} {}->{}: {:?}",
                 bitoff,
                 i,
@@ -125,18 +125,18 @@ fn minimize_via_scalar_shrink<F: Fn(InfoTap) -> bool>(
             );
 
             if candidate.buffer() == p.buffer() {
-                println!("No change");
+                trace!("No change");
                 continue;
             }
 
             let test = pred(candidate.tap());
-            println!("test result {}", test);
+            trace!("test result {}", test);
             if test {
                 if let Some(res) = minimize(&candidate, pred) {
-                    println!("Returning shrunk: {:?}", res);
+                    trace!("Returning shrunk: {:?}", res);
                     return Some(res);
                 } else {
-                    println!("Returning original: {:?}", candidate);
+                    trace!("Returning original: {:?}", candidate);
                     return Some(candidate.clone());
                 }
             }
@@ -156,7 +156,7 @@ pub fn minimize<F: Fn(InfoTap) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPo
         return Some(res);
     }
 
-    println!("Nothing smaller found than {:?}", p);
+    trace!("Nothing smaller found than {:?}", p);
     None
 }
 

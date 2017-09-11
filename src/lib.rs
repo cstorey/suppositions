@@ -1,5 +1,7 @@
 extern crate rand;
 extern crate hex_slice;
+#[macro_use]
+extern crate log;
 
 use std::fmt;
 
