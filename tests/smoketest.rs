@@ -30,7 +30,7 @@ fn some_approximation_of_failing_example() {
 
 // http://matt.might.net/articles/quick-quickcheck/
 #[test]
-#[ignore]
+#[should_panic]
 fn mersenne_conjecture() {
     env_logger::init().unwrap_or(());
     fn is_prime(n: u64) -> bool {
@@ -41,7 +41,8 @@ fn mersenne_conjecture() {
         }
     }
 
-    property(u8s().filter(|&n: &u8| n < 64).filter(|&n: &u8| {
+    // Only check small primes.
+    property(u8s().filter(|&n: &u8| n < 16).filter(|&n: &u8| {
         debug!("mersenne_conjecture n: {}", n);
         let primep = is_prime(n as u64);
         debug!("mersenne_conjecture n: {}; prime? {}", n, primep);
