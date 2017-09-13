@@ -25,3 +25,5 @@
   * Make optional, to avoid extra Ord/Hash constraint
 * Stats on runs/skips/fails on random/shrinkage
 * Auto size pool (lazily create pool from rand source and cache into Vec)
+* Derive input based on trace of execution? (ie: lineage driven fault injection)
+* CoArbitrary equivalent?
