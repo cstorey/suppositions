@@ -22,10 +22,12 @@ impl fmt::Debug for InfoPool {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PoolExhausted;
+pub enum DataError {
+    PoolExhausted,
+    SkipItem,
+}
 
-pub type Maybe<T> = Result<T, PoolExhausted>;
-
+pub type Maybe<T> = Result<T, DataError>;
 
 impl InfoPool {
     pub fn of_vec(data: Vec<u8>) -> Self {
@@ -51,7 +53,7 @@ impl<'a> InfoTap<'a> {
     pub fn next_byte(&mut self) -> Maybe<u8> {
         let res = self.data.get(self.off).cloned();
         self.off += 1;
-        res.ok_or(PoolExhausted)
+        res.ok_or(DataError::PoolExhausted)
     }
 }
 
@@ -172,7 +174,7 @@ mod tests {
         assert_eq!(t.next_byte(), Ok(1));
         assert_eq!(t.next_byte(), Ok(2));
         assert_eq!(t.next_byte(), Ok(3));
-        assert_eq!(t.next_byte(), Err(PoolExhausted));
+        assert_eq!(t.next_byte(), Err(DataError::PoolExhausted));
     }
 
     #[test]

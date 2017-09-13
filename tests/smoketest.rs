@@ -28,6 +28,27 @@ fn some_approximation_of_failing_example() {
     })
 }
 
+// http://matt.might.net/articles/quick-quickcheck/
+#[test]
+#[ignore]
+fn mersenne_conjecture() {
+    env_logger::init().unwrap_or(());
+    fn is_prime(n: u64) -> bool {
+        match n {
+            0 | 1 => false,
+            2 => true,
+            n => !(2..n - 1).any(|q| (n % q) == 0),
+        }
+    }
+
+    property(u8s().filter(|&n: &u8| n < 64).filter(|&n: &u8| {
+        debug!("mersenne_conjecture n: {}", n);
+        let primep = is_prime(n as u64);
+        debug!("mersenne_conjecture n: {}; prime? {}", n, primep);
+        n < 64 && primep
+    })).check(|n| is_prime((1u64 << n) - 1))
+}
+
 #[test]
 #[should_panic]
 fn trivial_failure() {
