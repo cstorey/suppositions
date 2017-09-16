@@ -14,7 +14,7 @@
     * [X] filter_map
     * [ ] flat_map (ie: a thing that varies the generator based on a value)?)
   * [ ] One of a set of generators
-  * [ ] Const value
+  * [X] Const value
 * [ ] Catch panics and extract panic message
 * [ ] Skip data items
 * [ ] Examples ("inspired" by hedgehog/hypothesis/etc)
