@@ -87,7 +87,7 @@ impl Generator for BoolGenerator {
     }
 }
 
-macro_rules! integer_gen {
+macro_rules! unsigned_integer_gen {
     ($name:ident, $ty:ty) => {
         pub fn $name() -> IntGenerator<$ty> {
             IntGenerator(PhantomData)
@@ -109,10 +109,41 @@ macro_rules! integer_gen {
     }
 }
 
-integer_gen!(u8s, u8);
-integer_gen!(u16s, u16);
-integer_gen!(u32s, u32);
-integer_gen!(u64s, u64);
+unsigned_integer_gen!(u8s, u8);
+unsigned_integer_gen!(u16s, u16);
+unsigned_integer_gen!(u32s, u32);
+unsigned_integer_gen!(u64s, u64);
+unsigned_integer_gen!(usizes, usize);
+
+// We use the equivalent unsigned generator as an intermediate
+macro_rules! signed_integer_gen {
+    ($name:ident, $ugen:expr, $ty:ty) => {
+        pub fn $name() -> IntGenerator<$ty> {
+            IntGenerator(PhantomData)
+        }
+
+        impl Generator for IntGenerator<$ty> {
+            type Item = $ty;
+            fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+                let inner_g = $ugen;
+                let uval = inner_g.generate(src)?;
+                let is_neg = (uval & 1) == 0;
+                let uval = uval >> 1;
+                if is_neg {
+                    Ok(-(uval as $ty))
+                } else {
+                    Ok(uval as $ty)
+                }
+            }
+        }
+    }
+}
+
+signed_integer_gen!(i8s, u8s(), i8);
+signed_integer_gen!(i16s, u16s(), i16);
+signed_integer_gen!(i32s, u32s(), i32);
+signed_integer_gen!(i64s, u64s(), i64);
+signed_integer_gen!(isizes, usizes(), isize);
 
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
@@ -172,6 +203,7 @@ mod tests {
     use std::iter;
     use std::fmt;
     use super::*;
+    use super::super::*;
     use data::InfoPool;
     const SHORT_VEC_SIZE: usize = 256;
 
@@ -238,10 +270,38 @@ mod tests {
             })
             .take(nitems)
         {
-            assert!(v0 <= v1, "({:?} == {:?}) -> ({:?} == {:?})", p0, p1, v0, v1);
+            assert!(v0 <= v1, "({:?} < {:?}) -> ({:?} <= {:?})", p0, p1, v0, v1);
         }
     }
 
+    fn should_partially_order_same_as_source_by<G: Generator, K: PartialOrd, F: Fn(&G::Item) -> K>(
+        gen: G,
+        key: F,
+    ) where
+        G::Item: fmt::Debug,
+    {
+        let nitems = 100;
+        for (p0, p1, v0, v1) in iter::repeat(())
+            .map(|_| (gen_random_vec(), gen_random_vec()))
+            .filter(|&(ref v0, ref v1)| v0 < v1)
+            .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
+            .flat_map(|(p0, p1)| {
+                gen.generate(&mut p0.tap()).and_then(|v0| {
+                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
+                })
+            })
+            .take(nitems)
+        {
+            assert!(
+                key(&v0) <= key(&v1),
+                "({:?} < {:?}) -> ({:?} <= {:?})",
+                p0,
+                p1,
+                v0,
+                v1
+            );
+        }
+    }
 
     #[test]
     fn consts_should_generate_same_values() {
@@ -400,6 +460,11 @@ mod tests {
         should_generate_same_output_given_same_input((u8s(), u8s()))
     }
 
+    #[test]
+    fn i64s_should_generate_same_output_given_same_input() {
+        should_generate_same_output_given_same_input(i64s())
+    }
+
     // These really need to be proper statistical tests.
     #[test]
     fn tuple_u8s_u8s_usually_generates_different_output_for_different_inputs() {
@@ -415,6 +480,37 @@ mod tests {
     fn tuple_u8s_u8s_should_partially_order_same_as_source() {
         should_partially_order_same_as_source((u8s(), u8s()));
     }
+
+    #[test]
+    fn i64s_usually_generates_different_output_for_different_inputs() {
+        usually_generates_different_output_for_different_inputs(i64s());
+    }
+
+    #[test]
+    fn i64s_minimize_to_zero() {
+        should_minimize_to(i64s(), 0);
+    }
+
+    #[test]
+    fn i64s_should_partially_order_same_as_source() {
+        should_partially_order_same_as_source_by(i64s(), |&v| v.abs());
+    }
+
+    #[test]
+    fn dogfood_i64s_should_partially_order_same_as_source() {
+        env_logger::init().unwrap_or(());
+        let gen = i64s();
+        property(
+            (info_pools(16), info_pools(16))
+                .filter(|&(ref p0, ref p1)| p0.buffer() < p1.buffer())
+                .filter_map(|(p0, p1)| {
+                    gen.generate(&mut p0.tap()).and_then(|v0| {
+                        gen.generate(&mut p1.tap()).map(|v1| (v0, v1))
+                    })
+                }),
+        ).check(|(v0, v1)| v0.abs() <= v1.abs())
+    }
+
 
     #[test]
     fn filter_should_pass_through_when_true() {

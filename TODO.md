@@ -11,6 +11,7 @@
   * [ ] combinators
     * [X] filter
     * [ ] map
+    * [X] filter_map
     * [ ] flat_map (ie: a thing that varies the generator based on a value)?)
   * [ ] One of a set of generators
   * [ ] Const value
