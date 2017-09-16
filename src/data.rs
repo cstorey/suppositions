@@ -2,7 +2,7 @@ use std::fmt;
 use hex_slice::AsHex;
 use rand::random;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq)]
 pub struct InfoPool {
     data: Vec<u8>,
 }

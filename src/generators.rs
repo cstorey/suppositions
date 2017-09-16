@@ -7,6 +7,7 @@ use data::*;
 pub struct BoolGenerator;
 pub struct IntGenerator<N>(PhantomData<N>);
 pub struct VecGenerator<G>(G);
+pub struct InfoPoolGenerator(usize);
 
 pub struct Filtered<G, F>(G, F);
 pub struct Const<V>(V);
@@ -36,6 +37,10 @@ pub fn consts<V>(val: V) -> Const<V> {
     Const(val)
 }
 
+pub fn info_pools(len: usize) -> InfoPoolGenerator {
+    InfoPoolGenerator(len)
+}
+
 impl<G: Generator> Generator for VecGenerator<G> {
     type Item = Vec<G::Item>;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
@@ -47,6 +52,20 @@ impl<G: Generator> Generator for VecGenerator<G> {
         }
 
         Ok(result)
+    }
+}
+
+impl Generator for InfoPoolGenerator {
+    type Item = InfoPool;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let mut result = Vec::new();
+        let vals = u8s();
+        for _ in 0..self.0 {
+            let item = vals.generate(src)?;
+            result.push(item)
+        }
+
+        Ok(InfoPool::of_vec(result))
     }
 }
 
@@ -285,6 +304,23 @@ mod tests {
         );
     }
 
+    #[test]
+    fn info_pools_should_generate_same_output_given_same_input() {
+        should_generate_same_output_given_same_input(info_pools(8))
+    }
+
+    #[test]
+    fn info_pools_usually_generates_different_output_for_different_inputs() {
+        usually_generates_different_output_for_different_inputs(info_pools(8))
+    }
+
+    #[test]
+    fn info_pools_minimize_to_empty() {
+        env_logger::init().unwrap_or(());
+        // We force the generator to output a fixed length.
+        // This is perhaps not the best idea ever; but it'll do for now.
+        should_minimize_to(info_pools(8), InfoPool::of_vec(vec![0; 8]))
+    }
 
     #[test]
     fn u8s_should_generate_same_output_given_same_input() {
