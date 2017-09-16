@@ -6,6 +6,7 @@ use data::*;
 
 pub struct BoolGenerator;
 pub struct IntGenerator<N>(PhantomData<N>);
+pub struct FloatGenerator<N>(PhantomData<N>);
 pub struct VecGenerator<G>(G);
 pub struct InfoPoolGenerator(usize);
 
@@ -144,6 +145,35 @@ signed_integer_gen!(i16s, u16s(), i16);
 signed_integer_gen!(i32s, u32s(), i32);
 signed_integer_gen!(i64s, u64s(), i64);
 signed_integer_gen!(isizes, usizes(), isize);
+
+
+// As with signed types, use the equivalent unsigned generator as an intermediate
+macro_rules! float_gen {
+    ($name:ident, $ugen:expr, $ty:ident) => {
+        pub fn $name() -> FloatGenerator<$ty> {
+            FloatGenerator(PhantomData)
+        }
+
+        impl Generator for FloatGenerator<$ty> {
+            type Item = $ty;
+            fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+                let inner_g = $ugen;
+                let uval = inner_g.generate(src)?;
+
+                let is_neg = (uval & 1) == 0;
+                let fval = $ty::from_bits(uval >> 1);
+                if is_neg {
+                    Ok(-(fval as $ty))
+                } else {
+                    Ok(fval as $ty)
+                }
+            }
+        }
+    }
+}
+
+float_gen!(f32s, u32s(), f32);
+float_gen!(f64s, u64s(), f64);
 
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
@@ -481,6 +511,15 @@ mod tests {
         should_generate_same_output_given_same_input(i64s())
     }
 
+    #[test]
+    fn dogfood_i64s_should_generate_same_output_given_same_input() {
+        let gen = i64s();
+        property(info_pools(64).filter_map(|p| {
+            let v0 = gen.generate_from(&p)?;
+            let v1 = gen.generate_from(&p)?;
+            Ok((v0, v1))
+        })).check(|(v0, v1)| v0 == v1)
+    }
 
     #[test]
     fn i64s_usually_generates_different_output_for_different_inputs() {
@@ -512,6 +551,35 @@ mod tests {
         ).check(|(v0, v1)| v0.abs() <= v1.abs())
     }
 
+    #[test]
+    fn dogfood_f64s_should_generate_same_output_given_same_input() {
+        let gen = f64s();
+        property(
+            info_pools(32)
+                .filter_map(|p| {
+                    let v0 = gen.generate_from(&p)?;
+                    let v1 = gen.generate_from(&p)?;
+                    Ok((v0, v1))
+                })
+                .filter(|&(v0, v1)| !(v0.is_nan() || v1.is_nan())),
+        ).check(|(v0, v1)| v0 == v1)
+    }
+
+    #[test]
+    fn dogfood_f64s_should_partially_order_same_as_source() {
+        env_logger::init().unwrap_or(());
+        let gen = f64s();
+        property(
+            (info_pools(16), info_pools(16))
+                .filter(|&(ref p0, ref p1)| p0.buffer() < p1.buffer())
+                .filter_map(|(p0, p1)| {
+                    let v0 = gen.generate_from(&p0)?;
+                    let v1 = gen.generate_from(&p1)?;
+                    Ok((v0, v1))
+                })
+                .filter(|&(v0, v1)| !(v0.is_nan() || v1.is_nan())),
+        ).check(|(v0, v1)| v0.abs() <= v1.abs())
+    }
 
     #[test]
     fn filter_should_pass_through_when_true() {

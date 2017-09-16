@@ -2,7 +2,7 @@
 
 * [ ] Generators
   * [X] Integers & other Primitives
-  * [ ] Floats
+  * [X] Floats
   * [ ] Result
   * [ ] Weighted coin
   * [ ] FromIterator having things

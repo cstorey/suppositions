@@ -12,7 +12,7 @@ use data::*;
 use generators::*;
 
 const NUM_TESTS: usize = 100;
-const MAX_SKIPS: usize = 100;
+const MAX_SKIPS: usize = NUM_TESTS * 10;
 const DEFAULT_POOL_SIZE: usize = 1024;
 
 pub struct Property<G> {
