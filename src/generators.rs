@@ -108,6 +108,7 @@ mod tests {
     extern crate env_logger;
     use rand::random;
     use std::iter;
+    use std::fmt;
     use super::*;
     use data::InfoPool;
     const SHORT_VEC_SIZE: usize = 64;
@@ -115,6 +116,46 @@ mod tests {
     fn gen_random_vec() -> Vec<u8> {
         (0..SHORT_VEC_SIZE).map(|_| random()).collect::<Vec<u8>>()
     }
+
+    fn should_generate_same_output_given_same_input<G: Generator>(gen: G)
+    where
+        G::Item: fmt::Debug + PartialEq,
+    {
+        for (p0, p1, v0, v1) in iter::repeat(())
+            .map(|_| gen_random_vec())
+            .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
+            .flat_map(|(p0, p1)| {
+                gen.generate(&mut p0.tap()).and_then(|v0| {
+                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
+                })
+            })
+            .take(100)
+        {
+            assert!(v0 == v1, "({:?} == {:?}) -> ({:?} == {:?})", p0, p1, v0, v1);
+        }
+    }
+
+    fn usually_generates_different_output_for_different_inputs<G: Generator>(gen: G)
+    where
+        G::Item: PartialEq,
+    {
+        let nitems = 100;
+        let differing = iter::repeat(())
+            .map(|_| (gen_random_vec(), gen_random_vec()))
+            .filter(|&(ref v0, ref v1)| v0 != v1)
+            .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
+            .flat_map(|(p0, p1)| {
+                gen.generate(&mut p0.tap()).and_then(|v0| {
+                    gen.generate(&mut p1.tap()).map(|v1| (v0, v1))
+                })
+            })
+            .take(nitems)
+            .filter(|&(ref v0, ref v1)| v0 != v1)
+            .count();
+        assert!(differing > 0, "Differing items:{} > 0", differing);
+
+    }
+
 
     #[test]
     fn consts_should_generate_same_values() {
@@ -141,106 +182,49 @@ mod tests {
         assert_eq!(bools.generate(&mut InfoPool::of_vec(v1).tap()), Ok(true));
     }
 
-    #[test]
-    fn bools_should_generate_same_output_given_same_input() {
-        let gen = booleans();
-        for (p0, p1, v0, v1) in iter::repeat(())
-            .map(|_| gen_random_vec())
-            .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
-            .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.tap()).and_then(|v0| {
-                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
-                })
-            })
-            .take(100)
-        {
-            assert!(v0 == v1, "({:?} == {:?}) -> ({:?} == {:?})", p0, p1, v0, v1);
-        }
-
-    }
-
-    // These really need to be proper statistical tests.
-    #[test]
-    fn bools_usually_generates_different_output_for_different_inputs() {
-        let gen = booleans();
-        let nitems = 100;
-        let differing = iter::repeat(())
-            .map(|_| (gen_random_vec(), gen_random_vec()))
-            .filter(|&(ref v0, ref v1)| v0 != v1)
-            .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
-            .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.tap()).and_then(|v0| {
-                    gen.generate(&mut p1.tap()).map(|v1| (v0, v1))
-                })
-            })
-            .take(nitems)
-            .filter(|&(ref v0, ref v1)| v0 != v1)
-            .count();
-        assert!(differing > 0, "Differing items:{} > 0", differing);
-    }
-
-    #[test]
-    fn bools_minimize_to_false() {
-        let gen = booleans();
+    fn should_minimize_to<G: Generator>(gen: G, expected: G::Item)
+    where
+        G::Item: fmt::Debug + PartialEq,
+    {
         let p = InfoPool::random_of_size(4);
         debug!("Before: {:?}", p);
         let p = find_minimal(&gen, p, |_| true);
         debug!("After: {:?}", p);
 
         let val = gen.generate(&mut p.tap()).expect("generated value");
-        assert_eq!(val, false);
+        assert_eq!(val, expected);
+
+    }
+    #[test]
+    fn bools_should_generate_same_output_given_same_input() {
+        should_generate_same_output_given_same_input(booleans())
+    }
+
+    // These really need to be proper statistical tests.
+    #[test]
+    fn bools_usually_generates_different_output_for_different_inputs() {
+        usually_generates_different_output_for_different_inputs(booleans())
+    }
+
+    #[test]
+    fn bools_minimize_to_false() {
+        should_minimize_to(booleans(), false)
     }
 
     #[test]
     fn vecs_should_generate_same_output_given_same_input() {
-        let gen = vecs(booleans());
-        for (p0, p1, v0, v1) in iter::repeat(())
-            .map(|_| gen_random_vec())
-            .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
-            .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.tap()).and_then(|v0| {
-                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
-                })
-            })
-            .take(100)
-        {
-            assert!(v0 == v1, "({:?} == {:?}) -> ({:?} == {:?})", p0, p1, v0, v1);
-        }
+        should_generate_same_output_given_same_input(vecs(booleans()));
     }
 
     #[test]
     fn vecs_usually_generates_different_output_for_different_inputs() {
-        let gen = vecs(booleans());
-        let nitems = 100;
-        let differing = iter::repeat(())
-            .map(|_| (gen_random_vec(), gen_random_vec()))
-            .filter(|&(ref v0, ref v1)| v0 != v1)
-            .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
-            .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.tap()).and_then(|v0| {
-                    gen.generate(&mut p1.tap()).map(|v1| (v0, v1))
-                })
-            })
-            .take(nitems)
-            .filter(|&(ref v0, ref v1)| v0 != v1)
-            .count();
-        assert!(differing > 0, "Differing items:{} > 0", differing);
+        usually_generates_different_output_for_different_inputs(vecs(booleans()))
     }
 
     #[test]
     fn vec_bools_minimize_to_empty() {
         env_logger::init().unwrap_or(());
-        let gen = vecs(booleans());
-        let p = InfoPool::random_of_size(SHORT_VEC_SIZE);
-        debug!("Before: {:?}", p);
-        let p = find_minimal(&gen, p, |v| {
-            info!("Check: {:?}", v);
-            true
-        });
-        debug!("After: {:?}", p);
-
-        let val = gen.generate(&mut p.tap()).expect("generated value");
-        assert_eq!(val, vec![]);
+        should_minimize_to(vecs(booleans()), vec![])
     }
 
     #[test]
@@ -264,52 +248,18 @@ mod tests {
 
     #[test]
     fn u8s_should_generate_same_output_given_same_input() {
-        let gen = u8s();
-        for (p0, p1, v0, v1) in iter::repeat(())
-            .map(|_| gen_random_vec())
-            .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
-            .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.tap()).and_then(|v0| {
-                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
-                })
-            })
-            .take(100)
-        {
-            assert!(v0 == v1, "({:?} == {:?}) -> ({:?} == {:?})", p0, p1, v0, v1);
-        }
-
+        should_generate_same_output_given_same_input(u8s())
     }
 
     // These really need to be proper statistical tests.
     #[test]
     fn u8s_usually_generates_different_output_for_different_inputs() {
-        let gen = u8s();
-        let nitems = 100;
-        let differing = iter::repeat(())
-            .map(|_| (gen_random_vec(), gen_random_vec()))
-            .filter(|&(ref v0, ref v1)| v0 != v1)
-            .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
-            .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.tap()).and_then(|v0| {
-                    gen.generate(&mut p1.tap()).map(|v1| (v0, v1))
-                })
-            })
-            .take(nitems)
-            .filter(|&(ref v0, ref v1)| v0 != v1)
-            .count();
-        assert!(differing > 0, "Differing items:{} > 0", differing);
+        usually_generates_different_output_for_different_inputs(u8s());
     }
 
     #[test]
     fn u8s_minimize_to_zero() {
-        let gen = u8s();
-        let p = InfoPool::random_of_size(4);
-        debug!("Before: {:?}", p);
-        let p = find_minimal(&gen, p, |_| true);
-        debug!("After: {:?}", p);
-
-        let val = gen.generate(&mut p.tap()).expect("generated value");
-        assert_eq!(val, 0);
+        should_minimize_to(u8s(), 0);
     }
 
     #[test]

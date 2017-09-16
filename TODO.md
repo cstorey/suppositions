@@ -2,6 +2,8 @@
 
 * [ ] Generators
   * [X] Integers & other Primitives
+  * [ ] Floats
+  * [ ] Result
   * [ ] Weighted coin
   * [ ] FromIterator having things
     * [ ] Min/max/average lengths via reservoir-esque sampling
