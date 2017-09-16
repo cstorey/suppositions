@@ -111,7 +111,7 @@ mod tests {
     use std::fmt;
     use super::*;
     use data::InfoPool;
-    const SHORT_VEC_SIZE: usize = 64;
+    const SHORT_VEC_SIZE: usize = 256;
 
     fn gen_random_vec() -> Vec<u8> {
         (0..SHORT_VEC_SIZE).map(|_| random()).collect::<Vec<u8>>()
@@ -186,7 +186,15 @@ mod tests {
     where
         G::Item: fmt::Debug + PartialEq,
     {
-        let p = InfoPool::random_of_size(4);
+        let mut p;
+        loop {
+            p = InfoPool::random_of_size(SHORT_VEC_SIZE);
+            match gen.generate(&mut p.tap()) {
+                Ok(_) => break,
+                Err(DataError::SkipItem) => (),
+                Err(DataError::PoolExhausted) => panic!("Not enough pool to generate data"),
+            }
+        }
         debug!("Before: {:?}", p);
         let p = find_minimal(&gen, p, |_| true);
         debug!("After: {:?}", p);
@@ -229,20 +237,11 @@ mod tests {
 
     #[test]
     fn vec_bools_can_minimise_with_predicate() {
-        let gen = vecs(booleans());
-        let mut p = InfoPool::random_of_size(SHORT_VEC_SIZE);
-        while !gen.generate(&mut p.tap()).map(|v| v.len() > 2).unwrap_or(
-            false,
-        )
-        {
-            p = InfoPool::random_of_size(SHORT_VEC_SIZE);
-        }
-        debug!("Before: {:?}", p);
-        let p = find_minimal(&gen, p, |v| v.len() > 2);
-        debug!("After: {:?}", p);
-
-        let val = gen.generate(&mut p.tap()).expect("generated value");
-        assert_eq!(val, vec![false, false, false]);
+        env_logger::init().unwrap_or(());
+        should_minimize_to(
+            vecs(booleans()).filter(|v| v.len() > 2),
+            vec![false, false, false],
+        );
     }
 
 
