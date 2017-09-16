@@ -460,12 +460,7 @@ mod tests {
         should_generate_same_output_given_same_input((u8s(), u8s()))
     }
 
-    #[test]
-    fn i64s_should_generate_same_output_given_same_input() {
-        should_generate_same_output_given_same_input(i64s())
-    }
 
-    // These really need to be proper statistical tests.
     #[test]
     fn tuple_u8s_u8s_usually_generates_different_output_for_different_inputs() {
         usually_generates_different_output_for_different_inputs((u8s(), u8s()));
@@ -480,6 +475,12 @@ mod tests {
     fn tuple_u8s_u8s_should_partially_order_same_as_source() {
         should_partially_order_same_as_source((u8s(), u8s()));
     }
+
+    #[test]
+    fn i64s_should_generate_same_output_given_same_input() {
+        should_generate_same_output_given_same_input(i64s())
+    }
+
 
     #[test]
     fn i64s_usually_generates_different_output_for_different_inputs() {
