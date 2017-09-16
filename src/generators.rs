@@ -26,9 +26,8 @@ pub trait Generator {
 pub fn booleans() -> BoolGenerator {
     BoolGenerator
 }
-pub fn u8s() -> IntGenerator<u8> {
-    IntGenerator(PhantomData)
-}
+
+
 pub fn vecs<G>(inner: G) -> VecGenerator<G> {
     VecGenerator(inner)
 }
@@ -58,19 +57,32 @@ impl Generator for BoolGenerator {
     }
 }
 
-impl Generator for IntGenerator<u8> {
-    type Item = u8;
-    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
-        assert!(size_of::<u8>() == 1);
-        let nbytes = size_of::<u8>() / size_of::<u8>();
-        let mut val: u8 = 0;
-        for _ in 0..nbytes {
-            val = val.wrapping_shl(8) | src.next_byte()?;
+macro_rules! integer_gen {
+    ($name:ident, $ty:ty) => {
+        pub fn $name() -> IntGenerator<$ty> {
+            IntGenerator(PhantomData)
         }
-        // src.next_byte().map(|next| next >= 0x80)
-        Ok(val)
+
+        impl Generator for IntGenerator<$ty> {
+            type Item = $ty;
+            fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+                assert!(size_of::<u8>() == 1);
+                let nbytes = size_of::<$ty>() / size_of::<u8>();
+                let mut val: $ty = 0;
+                for _ in 0..nbytes {
+                    val = val.wrapping_shl(8) | src.next_byte()? as $ty;
+                }
+                // src.next_byte().map(|next| next >= 0x80)
+                Ok(val)
+            }
+        }
     }
 }
+
+integer_gen!(u8s, u8);
+integer_gen!(u16s, u16);
+integer_gen!(u32s, u32);
+integer_gen!(u64s, u64);
 
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
@@ -293,6 +305,27 @@ mod tests {
     #[test]
     fn u8s_should_partially_order_same_as_source() {
         should_partially_order_same_as_source(u8s());
+    }
+
+    #[test]
+    fn u64s_should_generate_same_output_given_same_input() {
+        should_generate_same_output_given_same_input(u64s())
+    }
+
+    // These really need to be proper statistical tests.
+    #[test]
+    fn u64s_usually_generates_different_output_for_different_inputs() {
+        usually_generates_different_output_for_different_inputs(u64s());
+    }
+
+    #[test]
+    fn u64s_minimize_to_zero() {
+        should_minimize_to(u64s(), 0);
+    }
+
+    #[test]
+    fn u64s_should_partially_order_same_as_source() {
+        should_partially_order_same_as_source(u64s());
     }
 
     #[test]
