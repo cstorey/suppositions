@@ -123,6 +123,15 @@ impl<V: Clone> Generator for Const<V> {
     }
 }
 
+impl<G: Generator, H: Generator> Generator for (G, H) {
+    type Item = (G::Item, H::Item);
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let v0 = self.0.generate(src)?;
+        let v1 = self.1.generate(src)?;
+        Ok((v0, v1))
+    }
+}
+
 pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(
     gen: &G,
     pool: InfoPool,
@@ -362,6 +371,27 @@ mod tests {
     #[test]
     fn u64s_should_partially_order_same_as_source() {
         should_partially_order_same_as_source(u64s());
+    }
+
+    #[test]
+    fn tuple_u8s_u8s_should_generate_same_output_given_same_input() {
+        should_generate_same_output_given_same_input((u8s(), u8s()))
+    }
+
+    // These really need to be proper statistical tests.
+    #[test]
+    fn tuple_u8s_u8s_usually_generates_different_output_for_different_inputs() {
+        usually_generates_different_output_for_different_inputs((u8s(), u8s()));
+    }
+
+    #[test]
+    fn tuple_u8s_u8s_minimize_to_zero() {
+        should_minimize_to((u8s(), u8s()), (0, 0));
+    }
+
+    #[test]
+    fn tuple_u8s_u8s_should_partially_order_same_as_source() {
+        should_partially_order_same_as_source((u8s(), u8s()));
     }
 
     #[test]
