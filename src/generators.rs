@@ -10,17 +10,28 @@ pub struct VecGenerator<G>(G);
 pub struct InfoPoolGenerator(usize);
 
 pub struct Filtered<G, F>(G, F);
+pub struct FilterMapped<G, F>(G, F);
 pub struct Const<V>(V);
 
 pub trait Generator {
     type Item;
     fn generate(&self, source: &mut InfoTap) -> Maybe<Self::Item>;
+    fn generate_from(&self, source: &InfoPool) -> Maybe<Self::Item> {
+        self.generate(&mut source.tap())
+    }
 
     fn filter<F: Fn(&Self::Item) -> bool>(self, pred: F) -> Filtered<Self, F>
     where
         Self: Sized,
     {
         Filtered(self, pred)
+    }
+
+    fn filter_map<R, F: Fn(Self::Item) -> Maybe<R>>(self, pred: F) -> FilterMapped<Self, F>
+    where
+        Self: Sized,
+    {
+        FilterMapped(self, pred)
     }
 }
 
@@ -113,6 +124,17 @@ impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
         } else {
             Err(DataError::SkipItem)
         }
+    }
+}
+
+
+impl<G: Generator, R, F: Fn(G::Item) -> Maybe<R>> Generator for FilterMapped<G, F> {
+    type Item = R;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let &FilterMapped(ref gen, ref f) = self;
+        let val = gen.generate(src)?;
+        let out = f(val)?;
+        Ok(out)
     }
 }
 
@@ -408,4 +430,20 @@ mod tests {
         assert_eq!(gen.generate(&mut p.tap()), Err(DataError::SkipItem));
     }
 
+
+    #[test]
+    fn filter_map_should_pass_through_when_ok() {
+        let gen = consts(()).filter_map(|()| Ok(42usize));
+        let _: &Generator<Item = usize> = &gen;
+        let p = InfoPool::random_of_size(4);
+        assert_eq!(gen.generate_from(&p), Ok(42));
+    }
+
+    #[test]
+    fn filter_map_should_skip_when_err() {
+        let gen = consts(()).filter_map(|()| Err(DataError::SkipItem));
+        let _: &Generator<Item = usize> = &gen;
+        let p = InfoPool::random_of_size(4);
+        assert_eq!(gen.generate_from(&p), Err(DataError::SkipItem));
+    }
 }
