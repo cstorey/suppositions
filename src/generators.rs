@@ -156,6 +156,30 @@ mod tests {
 
     }
 
+    // Mostly only useful for scalar quantities. For collections, we basically say:
+    // `while booleans() { elemnt() }`
+    // So because booleans are imprecisly generated (ie: a pool of [0xff] ~ [0x80]),
+    // the source and result can have a differing ordering.
+    fn should_partially_order_same_as_source<G: Generator>(gen: G)
+    where
+        G::Item: PartialOrd + fmt::Debug,
+    {
+        let nitems = 100;
+        for (p0, p1, v0, v1) in iter::repeat(())
+            .map(|_| (gen_random_vec(), gen_random_vec()))
+            .filter(|&(ref v0, ref v1)| v0 < v1)
+            .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
+            .flat_map(|(p0, p1)| {
+                gen.generate(&mut p0.tap()).and_then(|v0| {
+                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
+                })
+            })
+            .take(nitems)
+        {
+            assert!(v0 <= v1, "({:?} == {:?}) -> ({:?} == {:?})", p0, p1, v0, v1);
+        }
+    }
+
 
     #[test]
     fn consts_should_generate_same_values() {
@@ -220,6 +244,11 @@ mod tests {
     }
 
     #[test]
+    fn bools_should_partially_order_same_as_source() {
+        should_partially_order_same_as_source(booleans())
+    }
+
+    #[test]
     fn vecs_should_generate_same_output_given_same_input() {
         should_generate_same_output_given_same_input(vecs(booleans()));
     }
@@ -259,6 +288,11 @@ mod tests {
     #[test]
     fn u8s_minimize_to_zero() {
         should_minimize_to(u8s(), 0);
+    }
+
+    #[test]
+    fn u8s_should_partially_order_same_as_source() {
+        should_partially_order_same_as_source(u8s());
     }
 
     #[test]
