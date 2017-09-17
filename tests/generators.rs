@@ -130,3 +130,24 @@ fn uniform_f64s_should_generate_values_between_0_and_1() {
 fn generator_map_should_trivially_preserve_invariants() {
     property(u8s().map(|v| (v as u16) * 2)).check(|v| v % 2 == 0)
 }
+
+#[test]
+fn one_of_should_pick_a_single_sample() {
+    let g = one_of(consts(1usize)).or(consts(2)).or(consts(3));
+    property(g).check(|v| v >= 1 && v <= 3)
+}
+
+#[test]
+fn one_of_should_partially_order_same_as_source() {
+    env_logger::init().unwrap_or(());
+    let gen = one_of(consts(1usize)).or(consts(2)).or(consts(3));
+    property(
+        (info_pools(16), info_pools(16))
+            .filter(|&(ref p0, ref p1)| p0.buffer() < p1.buffer())
+            .filter_map(|(p0, p1)| {
+                let v0 = gen.generate_from(&p0)?;
+                let v1 = gen.generate_from(&p1)?;
+                Ok((p0, p1, v0, v1))
+            })
+    ).check(|(_, _, v0, v1)| v0 <= v1)
+}

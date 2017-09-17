@@ -12,6 +12,8 @@ pub struct VecGenerator<G>(G);
 pub struct InfoPoolGenerator(usize);
 pub struct WeightedCoinGenerator(f32);
 
+pub struct OneOfGenerator<T>(Vec<Box<Generator<Item=T>>>);
+
 pub struct Filtered<G, F>(G, F);
 pub struct FilterMapped<G, F>(G, F);
 pub struct Mapped<G, F>(G, F);
@@ -266,6 +268,27 @@ impl<G: Generator, H: Generator> Generator for (G, H) {
         let v0 = self.0.generate(src)?;
         let v1 = self.1.generate(src)?;
         Ok((v0, v1))
+    }
+}
+
+pub fn one_of<G:Generator + 'static>(inner: G) -> OneOfGenerator<G::Item> {
+    let inners = vec![Box::new(inner) as Box<Generator<Item=G::Item>>];
+    OneOfGenerator(inners)
+}
+
+impl<T> OneOfGenerator<T> {
+    pub fn or<G: Generator<Item=T> + 'static>(mut self, other: G) -> Self {
+        self.0.push(Box::new(other));
+        self
+    }
+}
+
+impl<T>  Generator for  OneOfGenerator<T> {
+    type Item = T;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let v = u32s().generate(src)?;
+        let it = (v as usize * self.0.len()) >> 32;
+        self.0[it].generate(src)
     }
 }
 
