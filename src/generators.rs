@@ -10,6 +10,7 @@ pub struct FloatGenerator<N>(PhantomData<N>);
 pub struct UniformFloatGenerator<N>(PhantomData<N>);
 pub struct VecGenerator<G>(G);
 pub struct InfoPoolGenerator(usize);
+pub struct WeightedCoinGenerator(f32);
 
 pub struct Filtered<G, F>(G, F);
 pub struct FilterMapped<G, F>(G, F);
@@ -60,6 +61,10 @@ pub fn consts<V>(val: V) -> Const<V> {
 
 pub fn info_pools(len: usize) -> InfoPoolGenerator {
     InfoPoolGenerator(len)
+}
+
+pub fn weighted_coin(p: f32) -> WeightedCoinGenerator {
+    WeightedCoinGenerator(p)
 }
 
 impl<G: Generator> Generator for VecGenerator<G> {
@@ -205,6 +210,16 @@ macro_rules! uniform_float_gen {
 uniform_float_gen!(uniform_f32s, u32s(), u32, f32);
 uniform_float_gen!(uniform_f64s, u64s(), u64, f64);
 
+impl Generator for WeightedCoinGenerator {
+    type Item = bool;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let &WeightedCoinGenerator(p) = self;
+        let v = uniform_f32s().generate(src)?;
+        let res = v > (1.0-p);
+        Ok(res)
+    }
+}
+
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
@@ -217,7 +232,6 @@ impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
         }
     }
 }
-
 
 impl<G: Generator, R, F: Fn(G::Item) -> Maybe<R>> Generator for FilterMapped<G, F> {
     type Item = R;
@@ -579,6 +593,31 @@ mod tests {
         assert_eq!(gen.generate(&mut p.tap()), Err(DataError::SkipItem));
     }
 
+    #[test]
+    fn biased_coin() {
+        let mut rng = ::rand::XorShiftRng::new_unseeded();
+        let p = InfoPool::from_random_of_size(&mut rng, 1024);
+        let gen = weighted_coin(1.0 / 3.0);
+        let trials = 256;
+        let expected = trials / 3;
+        let allowed_error = trials / 32;
+        let mut heads = 0;
+        let mut t = p.tap();
+        for _ in 0..trials {
+            if gen.generate(&mut t).expect("a trial") {
+                heads += 1;
+            }
+        }
+
+        assert!(
+            heads >= (expected - allowed_error) && heads <= (expected + allowed_error),
+            "Expected 33% of {} trials ({}+/-{}); got {}",
+            trials,
+            expected,
+            allowed_error,
+            heads
+        );
+    }
 
     #[test]
     fn filter_map_should_pass_through_when_ok() {

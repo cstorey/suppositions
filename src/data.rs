@@ -1,6 +1,6 @@
 use std::fmt;
 use hex_slice::AsHex;
-use rand::random;
+use rand::{random, Rng, Rand};
 
 #[derive(Clone, Default, PartialEq)]
 pub struct InfoPool {
@@ -35,6 +35,14 @@ impl InfoPool {
     }
     pub fn random_of_size(size: usize) -> Self {
         Self::of_vec((0..size).map(|_| random()).collect::<Vec<u8>>())
+    }
+
+    pub fn from_random_of_size<R: Rng>(rng: &mut R, size: usize) -> Self {
+        Self::of_vec(
+            (0..size)
+                .map(|_| (u64::rand(rng) >> 56) as u8)
+                .collect::<Vec<u8>>(),
+        )
     }
 
     pub fn buffer(&self) -> &[u8] {
