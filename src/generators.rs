@@ -7,6 +7,7 @@ use data::*;
 pub struct BoolGenerator;
 pub struct IntGenerator<N>(PhantomData<N>);
 pub struct FloatGenerator<N>(PhantomData<N>);
+pub struct UniformFloatGenerator<N>(PhantomData<N>);
 pub struct VecGenerator<G>(G);
 pub struct InfoPoolGenerator(usize);
 
@@ -175,6 +176,27 @@ macro_rules! float_gen {
 float_gen!(f32s, u32s(), f32);
 float_gen!(f64s, u64s(), f64);
 
+// As with signed types, use the equivalent unsigned generator as an intermediate
+macro_rules! uniform_float_gen {
+    ($name:ident, $ugen:expr, $inty:ident, $ty:ident) => {
+        pub fn $name() -> UniformFloatGenerator<$ty> {
+            UniformFloatGenerator(PhantomData)
+        }
+
+        impl Generator for UniformFloatGenerator<$ty> {
+            type Item = $ty;
+            fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+                let inner_g = $ugen;
+                let uval = inner_g.generate(src)?;
+                return Ok(uval as $ty / $inty::max_value() as $ty);
+            }
+        }
+    }
+}
+
+uniform_float_gen!(uniform_f32s, u32s(), u32, f32);
+uniform_float_gen!(uniform_f64s, u64s(), u64, f64);
+
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
@@ -225,7 +247,6 @@ pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(
     }).unwrap_or(pool)
 }
 
-
 #[cfg(test)]
 mod tests {
     extern crate env_logger;
@@ -233,7 +254,6 @@ mod tests {
     use std::iter;
     use std::fmt;
     use super::*;
-    use super::super::*;
     use data::InfoPool;
     const SHORT_VEC_SIZE: usize = 256;
 
