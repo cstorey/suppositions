@@ -6,7 +6,6 @@ extern crate log;
 use std::fmt;
 
 pub mod data;
-pub mod subrandom;
 pub mod generators;
 
 use data::*;
