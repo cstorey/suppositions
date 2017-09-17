@@ -95,8 +95,10 @@ fn uniform_f64s_should_partially_order_same_as_source() {
 #[test]
 fn uniform_f64s_should_generate_values_between_0_and_1() {
     let gen = uniform_f64s();
-    property(
-        info_pools(32)
-            .filter_map(|p| gen.generate_from(&p))
-    ).check(|v| v >= 0.0 && v < 1.0)
+    property(info_pools(32).filter_map(|p| gen.generate_from(&p))).check(|v| v >= 0.0 && v < 1.0)
+}
+
+#[test]
+fn generator_map_should_trivially_preserve_invariants() {
+    property(u8s().map(|v| (v as u16) * 2)).check(|v| v % 2 == 0)
 }

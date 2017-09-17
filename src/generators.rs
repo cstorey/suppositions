@@ -13,6 +13,7 @@ pub struct InfoPoolGenerator(usize);
 
 pub struct Filtered<G, F>(G, F);
 pub struct FilterMapped<G, F>(G, F);
+pub struct Mapped<G, F>(G, F);
 pub struct Const<V>(V);
 
 pub trait Generator {
@@ -34,6 +35,13 @@ pub trait Generator {
         Self: Sized,
     {
         FilterMapped(self, pred)
+    }
+
+    fn map<R, F: Fn(Self::Item) -> R>(self, fun: F) -> Mapped<Self, F>
+    where
+        Self: Sized,
+    {
+        Mapped(self, fun)
     }
 }
 
@@ -217,6 +225,16 @@ impl<G: Generator, R, F: Fn(G::Item) -> Maybe<R>> Generator for FilterMapped<G, 
         let &FilterMapped(ref gen, ref f) = self;
         let val = gen.generate(src)?;
         let out = f(val)?;
+        Ok(out)
+    }
+}
+
+impl<G: Generator, R, F: Fn(G::Item) -> R> Generator for Mapped<G, F> {
+    type Item = R;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let &Mapped(ref gen, ref f) = self;
+        let val = gen.generate(src)?;
+        let out = f(val);
         Ok(out)
     }
 }
