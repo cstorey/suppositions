@@ -26,10 +26,16 @@
 * [ ] Configure number of runs/discards
 * [ ] Confgigure pool size (still an arbitrarily specified value)
 * [ ] Auto size pool (lazily create pool from rand source and cache into Vec)
-* [ ]  Avoid re-testing the same value 
+* [ ]  Avoid re-testing the same value
   * [ ] Keep previous value around; compare against it.
   * [ ] (eg: via scalable bloom/Cuckoo filters)
   * [ ] Make optional, to avoid extra Ord/Hash constraint
 * [ ] Stats on runs/skips/fails on random/shrinkage
 * [ ] Derive input based on trace of execution? (ie: lineage driven fault injection)
+* [ ] Track which bytes (regions) are used for which generators; use this in shrinking
+* [ ]
+  Use monad vs. applicative style interfaces to infer causal relations between
+  regions; Means that iff B is causally dependent upon A (eg: `A = bools();
+  B = someValue(); if A.generate(g) { out.emit(B.generate(g)) }`) We should
+  avoid deleting A `xor` B.
 * [ ] CoArbitrary equivalent?
