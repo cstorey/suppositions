@@ -1,6 +1,7 @@
 // Generators
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::iter;
 
 use data::*;
 
@@ -13,6 +14,7 @@ pub struct InfoPoolGenerator(usize);
 pub struct WeightedCoinGenerator(f32);
 pub struct OptionalGenerator<G>(G);
 pub struct ResultGenerator<G, H>(G, H);
+pub struct CollectionGenerator<C, G>(PhantomData<C>, G);
 
 pub struct OneOfGenerator<T>(Vec<Box<Generator<Item = T>>>);
 
@@ -77,6 +79,10 @@ pub fn optional<G>(inner: G) -> OptionalGenerator<G> {
 
 pub fn result<G: Generator, H: Generator>(ok: G, err: H) -> ResultGenerator<G, H> {
     ResultGenerator(ok, err)
+}
+
+pub fn from_iterator<C, G: Generator>(item: G) -> CollectionGenerator<C, G> where C:Extend<G::Item> {
+    CollectionGenerator(PhantomData, item)
 }
 
 impl<G: Generator> Generator for VecGenerator<G> {
@@ -261,7 +267,20 @@ impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
     }
 }
 
+impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerator<C, G> {
+    type Item = C;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let &CollectionGenerator(_, ref inner) = self;
+        let mut coll : C = Default::default();
+        let bs = booleans();
+        while bs.generate(src)? {
+            let item = inner.generate(src)?;
+            coll.extend(iter::once(item));
+        }
 
+        Ok(coll)
+    }
+}
 
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
@@ -637,6 +656,12 @@ mod tests {
     #[test]
     fn result_u8_u64s_minimize_to_ok() {
         should_minimize_to(result(u8s(), u64s()), Ok(0));
+    }
+
+    #[test]
+    fn from_iterator_u64s_minimize_to_empty() {
+        use std::collections::BTreeSet;
+        should_minimize_to(from_iterator::<BTreeSet<_>, _>(u8s()), BTreeSet::new());
     }
 
 
