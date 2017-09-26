@@ -3,17 +3,17 @@
 * [ ] Generators
   * [X] Integers & other Primitives
   * [X] Floats
-  * [ ] Result
-  * [ ] Weighted coin
-  * [ ] FromIterator having things
+  * [X] Result
+  * [X] Weighted coin
+  * [X] Collections
     * [ ] Min/max/average lengths via reservoir-esque sampling
-  * [ ] Argument emulation via tuple of generator is a generator of tuples
+  * [X] Argument emulation via tuple of generator is a generator of tuples
   * [ ] combinators
     * [X] filter
-    * [ ] map
+    * [X] map
     * [X] filter_map
     * [ ] flat_map (ie: a thing that varies the generator based on a value)?)
-  * [ ] One of a set of generators
+  * [X] One of a set of generators
   * [X] Const value
 * [ ] Catch panics and extract panic message
 * [ ] Skip data items
