@@ -11,6 +11,7 @@ pub struct UniformFloatGenerator<N>(PhantomData<N>);
 pub struct VecGenerator<G>(G);
 pub struct InfoPoolGenerator(usize);
 pub struct WeightedCoinGenerator(f32);
+pub struct OptionalGenerator<G>(G);
 
 pub struct OneOfGenerator<T>(Vec<Box<Generator<Item = T>>>);
 
@@ -68,6 +69,11 @@ pub fn info_pools(len: usize) -> InfoPoolGenerator {
 pub fn weighted_coin(p: f32) -> WeightedCoinGenerator {
     WeightedCoinGenerator(p)
 }
+
+pub fn optional<G>(inner: G) -> OptionalGenerator<G> {
+    OptionalGenerator(inner)
+}
+
 
 impl<G: Generator> Generator for VecGenerator<G> {
     type Item = Vec<G::Item>;
@@ -222,6 +228,22 @@ impl Generator for WeightedCoinGenerator {
     }
 }
 
+impl<G: Generator> Generator for OptionalGenerator<G> {
+    type Item = Option<G::Item>;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let bs = booleans();
+        let result = if bs.generate(src)? {
+            Some(self.0.generate(src)?)
+        } else {
+            None
+        };
+
+        Ok(result)
+    }
+}
+
+
+
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
@@ -370,7 +392,7 @@ mod tests {
         gen: G,
         key: F,
     ) where
-        G::Item: fmt::Debug,
+        G::Item: fmt::Debug + PartialEq,
     {
         let nitems = 100;
         for (p0, p1, v0, v1) in iter::repeat(())
@@ -588,6 +610,10 @@ mod tests {
         should_partially_order_same_as_source_by(i64s(), |&v| v.abs());
     }
 
+    #[test]
+    fn optional_u64s_minimize_to_none() {
+        should_minimize_to(optional(u64s()), None);
+    }
 
     #[test]
     fn filter_should_pass_through_when_true() {
