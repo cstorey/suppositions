@@ -12,7 +12,7 @@ pub struct VecGenerator<G>(G);
 pub struct InfoPoolGenerator(usize);
 pub struct WeightedCoinGenerator(f32);
 
-pub struct OneOfGenerator<T>(Vec<Box<Generator<Item=T>>>);
+pub struct OneOfGenerator<T>(Vec<Box<Generator<Item = T>>>);
 
 pub struct Filtered<G, F>(G, F);
 pub struct FilterMapped<G, F>(G, F);
@@ -217,7 +217,7 @@ impl Generator for WeightedCoinGenerator {
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
         let &WeightedCoinGenerator(p) = self;
         let v = uniform_f32s().generate(src)?;
-        let res = v > (1.0-p);
+        let res = v > (1.0 - p);
         Ok(res)
     }
 }
@@ -271,19 +271,19 @@ impl<G: Generator, H: Generator> Generator for (G, H) {
     }
 }
 
-pub fn one_of<G:Generator + 'static>(inner: G) -> OneOfGenerator<G::Item> {
-    let inners = vec![Box::new(inner) as Box<Generator<Item=G::Item>>];
+pub fn one_of<G: Generator + 'static>(inner: G) -> OneOfGenerator<G::Item> {
+    let inners = vec![Box::new(inner) as Box<Generator<Item = G::Item>>];
     OneOfGenerator(inners)
 }
 
 impl<T> OneOfGenerator<T> {
-    pub fn or<G: Generator<Item=T> + 'static>(mut self, other: G) -> Self {
+    pub fn or<G: Generator<Item = T> + 'static>(mut self, other: G) -> Self {
         self.0.push(Box::new(other));
         self
     }
 }
 
-impl<T>  Generator for  OneOfGenerator<T> {
+impl<T> Generator for OneOfGenerator<T> {
     type Item = T;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
         let v = u32s().generate(src)?;
@@ -361,22 +361,9 @@ mod tests {
     // the source and result can have a differing ordering.
     fn should_partially_order_same_as_source<G: Generator>(gen: G)
     where
-        G::Item: PartialOrd + fmt::Debug,
+        G::Item: PartialOrd + fmt::Debug + Clone,
     {
-        let nitems = 100;
-        for (p0, p1, v0, v1) in iter::repeat(())
-            .map(|_| (gen_random_vec(), gen_random_vec()))
-            .filter(|&(ref v0, ref v1)| v0 < v1)
-            .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
-            .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.tap()).and_then(|v0| {
-                    gen.generate(&mut p1.tap()).map(|v1| (p0, p1, v0, v1))
-                })
-            })
-            .take(nitems)
-        {
-            assert!(v0 <= v1, "({:?} < {:?}) -> ({:?} <= {:?})", p0, p1, v0, v1);
-        }
+        should_partially_order_same_as_source_by(gen, |v| v.clone())
     }
 
     fn should_partially_order_same_as_source_by<G: Generator, K: PartialOrd, F: Fn(&G::Item) -> K>(

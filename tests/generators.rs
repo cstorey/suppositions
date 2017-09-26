@@ -94,21 +94,18 @@ fn uniform_f64s_should_partially_order_same_as_source() {
 
 #[test]
 fn weighted_coin_should_generate_same_output_given_same_input() {
-    let gen = weighted_coin(1.0/ 7.0);
-    property(
-        info_pools(32)
-            .filter_map(|p| {
-                let v0 = gen.generate_from(&p)?;
-                let v1 = gen.generate_from(&p)?;
-                Ok((v0, v1))
-            })
-    ).check(|(v0, v1)| v0 == v1)
+    let gen = weighted_coin(1.0 / 7.0);
+    property(info_pools(32).filter_map(|p| {
+        let v0 = gen.generate_from(&p)?;
+        let v1 = gen.generate_from(&p)?;
+        Ok((v0, v1))
+    })).check(|(v0, v1)| v0 == v1)
 }
 
 #[test]
 fn weighted_coin_should_partially_order_same_as_source() {
     env_logger::init().unwrap_or(());
-    let gen = weighted_coin(1.0/ 7.0);
+    let gen = weighted_coin(1.0 / 7.0);
     property(
         (info_pools(16), info_pools(16))
             .filter(|&(ref p0, ref p1)| p0.buffer() < p1.buffer())
@@ -116,7 +113,7 @@ fn weighted_coin_should_partially_order_same_as_source() {
                 let v0 = gen.generate_from(&p0)?;
                 let v1 = gen.generate_from(&p1)?;
                 Ok((v0, v1))
-            })
+            }),
     ).check(|(v0, v1)| v0 <= v1)
 }
 
@@ -148,6 +145,6 @@ fn one_of_should_partially_order_same_as_source() {
                 let v0 = gen.generate_from(&p0)?;
                 let v1 = gen.generate_from(&p1)?;
                 Ok((p0, p1, v0, v1))
-            })
+            }),
     ).check(|(_, _, v0, v1)| v0 <= v1)
 }

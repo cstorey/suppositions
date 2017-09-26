@@ -20,7 +20,7 @@ pub struct Property<G> {
 }
 
 pub fn property<G>(gen: G) -> Property<G> {
-    Property { gen }
+    Property { gen: gen }
 }
 
 impl<G: Generator> Property<G>
