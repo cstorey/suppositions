@@ -12,6 +12,7 @@ pub struct VecGenerator<G>(G);
 pub struct InfoPoolGenerator(usize);
 pub struct WeightedCoinGenerator(f32);
 pub struct OptionalGenerator<G>(G);
+pub struct ResultGenerator<G, H>(G, H);
 
 pub struct OneOfGenerator<T>(Vec<Box<Generator<Item = T>>>);
 
@@ -74,6 +75,9 @@ pub fn optional<G>(inner: G) -> OptionalGenerator<G> {
     OptionalGenerator(inner)
 }
 
+pub fn result<G: Generator, H: Generator>(ok: G, err: H) -> ResultGenerator<G, H> {
+    ResultGenerator(ok, err)
+}
 
 impl<G: Generator> Generator for VecGenerator<G> {
     type Item = Vec<G::Item>;
@@ -236,6 +240,21 @@ impl<G: Generator> Generator for OptionalGenerator<G> {
             Some(self.0.generate(src)?)
         } else {
             None
+        };
+
+        Ok(result)
+    }
+}
+
+impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
+    type Item = Result<G::Item, H::Item>;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let &ResultGenerator(ref ok, ref err) = self;
+        let bs = booleans();
+        let result = if bs.generate(src)? {
+            Ok(ok.generate(src)?)
+        } else {
+            Err(err.generate(src)?)
         };
 
         Ok(result)
@@ -614,6 +633,12 @@ mod tests {
     fn optional_u64s_minimize_to_none() {
         should_minimize_to(optional(u64s()), None);
     }
+
+    #[test]
+    fn result_u8_u64s_minimize_to_ok() {
+        should_minimize_to(result(u8s(), u64s()), Ok(0));
+    }
+
 
     #[test]
     fn filter_should_pass_through_when_true() {
