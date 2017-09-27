@@ -27,12 +27,16 @@ impl fmt::Debug for InfoPool {
     }
 }
 
+/// The reasons why drawing data from a pool can fail.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DataError {
+    /// Not enough data to generate a value
     PoolExhausted,
+    /// One of our combinators said that we should not test this value.
     SkipItem,
 }
 
+/// A convenience alias for generators that use the pool.
 pub type Maybe<T> = Result<T, DataError>;
 
 impl InfoPool {
