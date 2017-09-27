@@ -113,7 +113,8 @@ pub fn weighted_coin(p: f32) -> WeightedCoinGenerator {
     WeightedCoinGenerator(p)
 }
 
-/// Generates an Optional<_> value with a 50% chance of Some(_), otherwise None.
+/// Generates an Optional<_> value with a 50% chance of `Some(_)` from the
+/// `inner` generator, otherwise None.
 pub fn optional<G>(inner: G) -> OptionalGenerator<G> {
     OptionalGenerator(inner)
 }
@@ -177,7 +178,7 @@ impl Generator for BoolGenerator {
 
 macro_rules! unsigned_integer_gen {
     ($name:ident, $ty:ty) => {
-        /// A generator that generates the full range of the specified type.
+        /// A generator that generates integers of the specified type.
         pub fn $name() -> IntGenerator<$ty> {
             IntGenerator(PhantomData)
         }
