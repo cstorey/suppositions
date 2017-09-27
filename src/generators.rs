@@ -81,7 +81,10 @@ pub fn result<G: Generator, H: Generator>(ok: G, err: H) -> ResultGenerator<G, H
     ResultGenerator(ok, err)
 }
 
-pub fn from_iterator<C, G: Generator>(item: G) -> CollectionGenerator<C, G> where C:Extend<G::Item> {
+pub fn from_iterator<C, G: Generator>(item: G) -> CollectionGenerator<C, G>
+where
+    C: Extend<G::Item>,
+{
     CollectionGenerator(PhantomData, item)
 }
 
@@ -271,7 +274,7 @@ impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerat
     type Item = C;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
         let &CollectionGenerator(_, ref inner) = self;
-        let mut coll : C = Default::default();
+        let mut coll: C = Default::default();
         let bs = booleans();
         while bs.generate(src)? {
             let item = inner.generate(src)?;

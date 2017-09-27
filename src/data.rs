@@ -1,12 +1,22 @@
+/*!
+This module contains the underlying data generation and shrinking mechanism. The main type is the `InfoPool`, which represents a pool of random bytes that can be observed via the `InfoTap` object (obtained via `InfoPool#tap`).
+
+*/
 use std::fmt;
 use hex_slice::AsHex;
 use rand::{random, Rng, Rand};
 
+#[doc = /**
+    A pool of data that we can draw upon to generate other types of data.
+*/]
 #[derive(Clone, Default, PartialEq)]
 pub struct InfoPool {
     data: Vec<u8>,
 }
 
+#[doc = /**
+    A handle to an info Pool that we can draw bytes from.
+*/]
 #[derive(Clone, Default)]
 pub struct InfoTap<'a> {
     data: &'a [u8],

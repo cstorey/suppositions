@@ -37,6 +37,8 @@
 
 //! Another common example is to verify that values can be round-tripped through a serialisation mechanism.
 
+#![warn(missing_docs)]
+
 extern crate rand;
 extern crate hex_slice;
 #[macro_use]
