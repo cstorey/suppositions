@@ -8,19 +8,13 @@ const NUM_TESTS: usize = 100;
 const MAX_SKIPS: usize = NUM_TESTS * 10;
 const DEFAULT_POOL_SIZE: usize = 1024;
 
-#[doc = /**
-This represents a configuration for a particular test, ie: a set of generators
-and a (currently fixed) set of test parameters.
-
-*/]
+/// This represents a configuration for a particular test, ie: a set of generators
+/// and a (currently fixed) set of test parameters.
 pub struct Property<G> {
     gen: G,
 }
 
-#[doc = /**
-This is the main entry point for users of the library.
-
-*/]
+/// This is the main entry point for users of the library.
 pub fn property<G>(gen: G) -> Property<G> {
     Property { gen: gen }
 }
@@ -29,11 +23,7 @@ impl<G: Generator> Property<G>
 where
     G::Item: fmt::Debug,
 {
-    #[doc = /**
-
-        Use this function to sepecify the thing you wish to check. 
-
-    */]
+    /// Use this function to sepecify the thing you wish to check.
     pub fn check<F: Fn(G::Item) -> bool>(self, check: F) {
         let mut tests_run = 0usize;
         let mut items_skipped = 0usize;
