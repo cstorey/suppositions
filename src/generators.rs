@@ -132,7 +132,7 @@ pub fn result<G: Generator, H: Generator>(ok: G, err: H) -> ResultGenerator<G, H
 /// ```
 /// use std::collections::BTreeSet;
 /// use suppositions::generators::*;
-/// let gen = collections::<BTreeSet<_>, _>(u8s()), BTreeSet::new());
+/// let gen = collections::<BTreeSet<_>, _>(u8s());
 /// ```
 pub fn collections<C, G: Generator>(item: G) -> CollectionGenerator<C, G>
 where
