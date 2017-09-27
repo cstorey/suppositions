@@ -1,10 +1,6 @@
 # Suppositions
 
-A property testing library for Rust.
-
-Bringing some of the ideas from [Hypothesis](https://github.com/HypothesisWorks/hypothesis-python), [Theft](https://github.com/HypothesisWorks/hypothesis-python) and [Hedgehog](https://hedgehog.qa/).
-
-I aim to bring in the compositional data generation from Hedgehog and Hypothesis and the [shrinking approach](http://hypothesis.works/articles/compositional-shrinking/) from Hypothesis.
+A property testing library for Rust, inspired by [Hypothesis](https://github.com/HypothesisWorks/hypothesis-python), [Theft](https://github.com/HypothesisWorks/hypothesis-python) and [Hedgehog](https://hedgehog.qa/).
 
 ## Compositional data generators
 
@@ -17,6 +13,10 @@ This also means that the shrunk values from your first failing test will fulfil 
 ## Integrated shrinking.
 
 This essentially falls out of the above. Because generation is done from an underlying format; we don't need to re-implement shrinking for each individual type.
+
+## License
+
+Released under the [Apache 2.0](LICENSE-APACHE) license.
 
 ---
 Copyright 2017 Ceri Storey, Oliver Wyman.
