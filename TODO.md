@@ -21,8 +21,8 @@
 * [ ] TestResult trait for
   * [X] bool.
   * [X] Result.
-  * [ ] unit
-* [ ] Catch panics and extract panic message
+  * [X] unit
+* [X] Catch panics and extract panic message
 
 ## ???
 
