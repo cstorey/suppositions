@@ -14,6 +14,12 @@ pub struct Property<G> {
     gen: G,
 }
 
+/// This represents something that a check can return.
+pub trait CheckResult {
+    /// Check whether this result witnesses a failure.
+    fn is_failure(&self) -> bool;
+}
+
 /// This is the main entry point for users of the library.
 pub fn property<G>(gen: G) -> Property<G> {
     Property { gen: gen }
@@ -24,7 +30,7 @@ where
     G::Item: fmt::Debug,
 {
     /// Use this function to sepecify the thing you wish to check.
-    pub fn check<F: Fn(G::Item) -> bool>(self, check: F) {
+    pub fn check<R: CheckResult, F: Fn(G::Item) -> R>(self, check: F) {
         let mut tests_run = 0usize;
         let mut items_skipped = 0usize;
         while tests_run < NUM_TESTS {
@@ -33,8 +39,8 @@ where
                 Ok(arg) => {
                     let res = check(arg);
                     tests_run += 1;
-                    if !res {
-                        let minpool = find_minimal(&self.gen, pool, |v| !check(v));
+                    if res.is_failure() {
+                        let minpool = find_minimal(&self.gen, pool, |v| check(v).is_failure());
                         assert!(
                             false,
                             "Predicate failed for argument {:?}",
@@ -58,5 +64,17 @@ where
                 }
             }
         }
+    }
+}
+
+impl CheckResult for bool {
+    fn is_failure(&self) -> bool {
+        !self
+    }
+}
+
+impl<O, E> CheckResult for Result<O, E> {
+    fn is_failure(&self) -> bool {
+        self.is_err()
     }
 }

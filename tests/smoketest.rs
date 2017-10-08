@@ -69,3 +69,14 @@ fn value_dependent() {
         !v.into_iter().any(|t| t)
     })
 }
+
+#[test]
+#[should_panic(expected = "Predicate failed for argument ")]
+fn trivial_result_failure() {
+    property((booleans())).check(|_| -> Result<(), ()> { Err(()) })
+}
+
+#[test]
+fn trivial_result_pass() {
+    property((booleans())).check(|_| -> Result<(), ()> { Ok(()) })
+}

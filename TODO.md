@@ -8,7 +8,7 @@
   * [X] Collections
     * [ ] Min/max/average lengths via reservoir-esque sampling
   * [X] Argument emulation via tuple of generator is a generator of tuples
-  * [ ] combinators
+  * combinators
     * [X] filter
     * [X] map
     * [X] filter_map
@@ -16,7 +16,10 @@
   * [X] One of a set of generators
   * [X] Const value
 * [X] Skip data items
-* [ ] TestResult trait for unit/bool/Result.
+* [ ] TestResult trait for
+  * [X] bool.
+  * [X] Result.
+  * [ ] unit
 * [ ] Catch panics and extract panic message
 
 ## ???
