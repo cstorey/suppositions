@@ -17,7 +17,7 @@ fn some_approximation_of_usage() {
 
 // In this case, we reverse the last three items.
 #[test]
-#[should_panic]
+#[should_panic(expected = "Predicate failed for argument ")]
 fn some_approximation_of_failing_example() {
     env_logger::init().unwrap_or(());
     property(vecs(booleans())).check(|l| {
@@ -30,7 +30,7 @@ fn some_approximation_of_failing_example() {
 
 // http://matt.might.net/articles/quick-quickcheck/
 #[test]
-#[should_panic]
+#[should_panic(expected = "Predicate failed for argument ")]
 fn mersenne_conjecture() {
     env_logger::init().unwrap_or(());
     fn is_prime(n: u64) -> bool {
@@ -51,8 +51,9 @@ fn mersenne_conjecture() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Predicate failed for argument ")]
 fn trivial_failure() {
+    env_logger::init().unwrap_or(());
     property((booleans())).check(|_| false)
 }
 
@@ -62,10 +63,40 @@ fn trivial_pass() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Predicate failed for argument ")]
 fn value_dependent() {
     property(vecs(booleans())).check(|v| {
         println!("Check: {:?}", v);
         !v.into_iter().any(|t| t)
     })
+}
+
+#[test]
+#[should_panic(expected = "Predicate failed for argument ")]
+fn trivial_result_failure() {
+    property((booleans())).check(|_| -> Result<(), ()> { Err(()) })
+}
+
+#[test]
+#[should_panic(expected = "horrible failure")]
+fn trivial_result_includes_failing_result() {
+    property((booleans())).check(|_| -> Result<(), &'static str> { Err("horrible failure") })
+}
+
+
+#[test]
+fn trivial_result_pass() {
+    property((booleans())).check(|_| -> Result<(), ()> { Ok(()) })
+}
+
+#[test]
+#[should_panic(expected = "Predicate failed for argument ")]
+fn trivial_panic_failure() {
+    property((booleans())).check(|_| -> () { panic!("Big bad boom") })
+}
+
+#[test]
+#[should_panic(expected = "Big bad boom")]
+fn panic_includes_failure_message() {
+    property((booleans())).check(|_| -> () { panic!("Big bad boom") })
 }

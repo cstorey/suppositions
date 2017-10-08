@@ -1,4 +1,4 @@
-## 0.1
+## 0.1.0
 
 * [ ] Generators
   * [X] Integers & other Primitives
@@ -8,21 +8,27 @@
   * [X] Collections
     * [ ] Min/max/average lengths via reservoir-esque sampling
   * [X] Argument emulation via tuple of generator is a generator of tuples
-  * [ ] combinators
+  * combinators
     * [X] filter
     * [X] map
     * [X] filter_map
     * [ ] flat_map (ie: a thing that varies the generator based on a value)?)
   * [X] One of a set of generators
   * [X] Const value
+* [X] Skip data items
+* [ ] TestResult trait for
+  * [X] bool.
+  * [X] Result.
+  * [ ] unit
 * [ ] Catch panics and extract panic message
-* [ ] Skip data items
+
+## ???
+
 * [ ] Examples ("inspired" by hedgehog/hypothesis/etc)
   * [ ] https://begriffs.com/posts/2017-01-14-design-use-quickcheck.html?hn=1
   * [ ] http://matt.might.net/articles/quick-quickcheck/
   * [ ] https://github.com/BurntSushi/quickcheck
   * [ ] https://github.com/hedgehogqa/haskell-hedgehog/tree/master/hedgehog-example/test/Test/Example
-* [ ] TestResult trait for unit/bool/Result.
 * [ ] Configure number of runs/discards
 * [ ] Confgigure pool size (still an arbitrarily specified value)
 * [ ] Auto size pool (lazily create pool from rand source and cache into Vec)
