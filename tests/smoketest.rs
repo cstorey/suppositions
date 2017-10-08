@@ -77,6 +77,13 @@ fn trivial_result_failure() {
 }
 
 #[test]
+#[should_panic(expected = "horrible failure")]
+fn trivial_result_includes_failing_result() {
+    property((booleans())).check(|_| -> Result<(), &'static str> { Err("horrible failure") })
+}
+
+
+#[test]
 fn trivial_result_pass() {
     property((booleans())).check(|_| -> Result<(), ()> { Ok(()) })
 }

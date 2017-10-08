@@ -30,7 +30,7 @@ where
     G::Item: fmt::Debug,
 {
     /// Use this function to sepecify the thing you wish to check.
-    pub fn check<R: CheckResult, F: Fn(G::Item) -> R>(self, check: F) {
+    pub fn check<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(self, check: F) {
         let mut tests_run = 0usize;
         let mut items_skipped = 0usize;
         while tests_run < NUM_TESTS {
@@ -41,10 +41,10 @@ where
                     tests_run += 1;
                     if res.is_failure() {
                         let minpool = find_minimal(&self.gen, pool, |v| check(v).is_failure());
-                        assert!(
-                            false,
-                            "Predicate failed for argument {:?}",
-                            self.gen.generate(&mut minpool.tap())
+                        panic!(
+                            "Predicate failed for argument {:?}; check returned {:?}",
+                            self.gen.generate(&mut minpool.tap()),
+                            res
                         )
                     }
                 }
