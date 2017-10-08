@@ -53,6 +53,7 @@ fn mersenne_conjecture() {
 #[test]
 #[should_panic(expected = "Predicate failed for argument ")]
 fn trivial_failure() {
+    env_logger::init().unwrap_or(());
     property((booleans())).check(|_| false)
 }
 
@@ -86,4 +87,16 @@ fn trivial_result_includes_failing_result() {
 #[test]
 fn trivial_result_pass() {
     property((booleans())).check(|_| -> Result<(), ()> { Ok(()) })
+}
+
+#[test]
+#[should_panic(expected = "Predicate failed for argument ")]
+fn trivial_panic_failure() {
+    property((booleans())).check(|_| -> () { panic!("Big bad boom") })
+}
+
+#[test]
+#[should_panic(expected = "Big bad boom")]
+fn panic_includes_failure_message() {
+    property((booleans())).check(|_| -> () { panic!("Big bad boom") })
 }
