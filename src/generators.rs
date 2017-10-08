@@ -17,7 +17,7 @@ pub struct FloatGenerator<N>(PhantomData<N>);
 /// or [`uniform_f64s`](fn.uniform_f64s.html)
 pub struct UniformFloatGenerator<N>(PhantomData<N>);
 /// See [`vecs`](fn.vecs.html)
-pub struct VecGenerator<G>(G);
+pub struct VecGenerator<G>(G, usize);
 /// See [`info_pools`](fn.info_pools.html)
 pub struct InfoPoolGenerator(usize);
 /// See [`weighted_coin`](fn.weighted_coin.html)
@@ -27,7 +27,11 @@ pub struct OptionalGenerator<G>(G);
 /// See [`result`](fn.result.html)
 pub struct ResultGenerator<G, H>(G, H);
 /// See [`collections`](fn.collections.html)
-pub struct CollectionGenerator<C, G>(PhantomData<C>, G);
+pub struct CollectionGenerator<C, G> {
+    witness: PhantomData<C>,
+    inner: G,
+    mean_length: usize,
+}
 
 /// See [`one_of`](fn.one_of.html)
 pub struct OneOfGenerator<T>(Vec<Box<Generator<Item = T>>>);
@@ -115,7 +119,15 @@ pub fn booleans() -> BoolGenerator {
 
 /// Generates vectors with items given by `inner`.
 pub fn vecs<G>(inner: G) -> VecGenerator<G> {
-    VecGenerator(inner)
+    VecGenerator(inner, 4)
+}
+
+impl<G> VecGenerator<G> {
+    /// Specify the mean length of the vector.
+    pub fn mean_length(mut self, mean: usize) -> Self {
+        self.1 = mean;
+        self
+    }
 }
 
 /// Always generates a clone of the given value.
@@ -158,16 +170,22 @@ pub fn collections<C, G: Generator>(item: G) -> CollectionGenerator<C, G>
 where
     C: Extend<G::Item>,
 {
-    CollectionGenerator(PhantomData, item)
+    CollectionGenerator {
+        witness: PhantomData,
+        inner: item,
+        mean_length: 16,
+    }
 }
 
 impl<G: Generator> Generator for VecGenerator<G> {
     type Item = Vec<G::Item>;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        let &VecGenerator(ref inner, ref mean) = self;
         let mut result = Vec::new();
-        let bs = booleans();
+        let p_is_final = 1.0 / (1.0 + *mean as f32);
+        let bs = weighted_coin(1.0 - p_is_final);
         while bs.generate(src)? {
-            let item = self.0.generate(src)?;
+            let item = inner.generate(src)?;
             result.push(item)
         }
 
@@ -348,15 +366,23 @@ impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
         Ok(result)
     }
 }
-
+impl<G, C> CollectionGenerator<C, G> {
+    /// Specify the mean number of _generated_ items. For collections with
+    /// set semantics, this many not be the same as the mean size of the
+    /// collection.
+    pub fn mean_length(mut self, mean: usize) -> Self {
+        self.mean_length = mean;
+        self
+    }
+}
 impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerator<C, G> {
     type Item = C;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
-        let &CollectionGenerator(_, ref inner) = self;
         let mut coll: C = Default::default();
-        let bs = booleans();
+        let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
+        let bs = weighted_coin(1.0 - p_is_final);
         while bs.generate(src)? {
-            let item = inner.generate(src)?;
+            let item = self.inner.generate(src)?;
             coll.extend(iter::once(item));
         }
 
@@ -822,5 +848,124 @@ mod tests {
         let _: &Generator<Item = usize> = &gen;
         let p = InfoPool::random_of_size(4);
         assert_eq!(gen.generate_from(&p), Err(DataError::SkipItem));
+    }
+
+    mod vector_lengths {
+        use super::*;
+        use data::InfoPool;
+        use std::collections::BTreeMap;
+
+        #[test]
+        fn mean_length_can_be_set_as_10() {
+            mean_length_can_be_set_as(10);
+        }
+
+        #[test]
+        fn mean_length_can_be_set_as_3() {
+            mean_length_can_be_set_as(3);
+        }
+
+        #[test]
+        fn mean_length_can_be_set_as_5() {
+            mean_length_can_be_set_as(5);
+        }
+
+        #[test]
+        fn mean_length_can_be_set_as_7() {
+            mean_length_can_be_set_as(7);
+        }
+
+        #[test]
+        fn mean_length_can_be_set_as_23() {
+            mean_length_can_be_set_as(23);
+        }
+        fn mean_length_can_be_set_as(len: usize) {
+            env_logger::init().unwrap_or(());
+            let gen = vecs(u8s()).mean_length(len);
+            let mut rng = ::rand::XorShiftRng::new_unseeded();
+            let trials = 1024usize;
+            let expected = len as f64;
+            let allowed_error = expected * 0.1;
+            let mut lengths = BTreeMap::new();
+            let p = InfoPool::from_random_of_size(&mut rng, 1 << 18);
+            let mut t = p.tap();
+            for _ in 0..trials {
+                let val = gen.generate(&mut t).expect("a trial");
+                *lengths.entry(val.len()).or_insert(0) += 1;
+            }
+
+            println!("Histogram: {:?}", lengths);
+            let mean: f64 = lengths
+                .iter()
+                .map(|(&l, &n)| (l * n) as f64 / trials as f64)
+                .sum();
+            assert!(
+                mean >= (expected - allowed_error) && mean <= (expected + allowed_error),
+                "Expected mean of {} trials ({}+/-{}); got {}",
+                trials,
+                expected,
+                allowed_error,
+                mean
+            );
+        }
+    }
+    mod collection_lengths {
+        use super::*;
+        use data::InfoPool;
+        use std::collections::{BTreeMap, LinkedList};
+
+        #[test]
+        fn mean_length_can_be_set_as_10() {
+            mean_length_can_be_set_as(10);
+        }
+
+        #[test]
+        fn mean_length_can_be_set_as_3() {
+            mean_length_can_be_set_as(3);
+        }
+
+        #[test]
+        fn mean_length_can_be_set_as_5() {
+            mean_length_can_be_set_as(5);
+        }
+
+        #[test]
+        fn mean_length_can_be_set_as_7() {
+            mean_length_can_be_set_as(7);
+        }
+
+        #[test]
+        fn mean_length_can_be_set_as_23() {
+            mean_length_can_be_set_as(23);
+        }
+        fn mean_length_can_be_set_as(len: usize) {
+            env_logger::init().unwrap_or(());
+            let gen = collections::<LinkedList<_>, _>(u8s()).mean_length(len);
+            let mut rng = ::rand::XorShiftRng::new_unseeded();
+            let trials = 1024usize;
+            let expected = len as f64;
+            let allowed_error = expected * 0.1;
+            let mut lengths = BTreeMap::new();
+            let p = InfoPool::from_random_of_size(&mut rng, 1 << 18);
+            let mut t = p.tap();
+            for _ in 0..trials {
+                let val = gen.generate(&mut t).expect("a trial");
+                *lengths.entry(val.len()).or_insert(0) += 1;
+            }
+
+            println!("Histogram: {:?}", lengths);
+            let mean: f64 = lengths
+                .iter()
+                .map(|(&l, &n)| (l * n) as f64 / trials as f64)
+                .sum();
+            assert!(
+                mean >= (expected - allowed_error) && mean <= (expected + allowed_error),
+                "Expected mean of {} trials ({}+/-{}); got {}",
+                trials,
+                expected,
+                allowed_error,
+                mean
+            );
+        }
     }
 }
