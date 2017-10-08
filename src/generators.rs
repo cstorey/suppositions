@@ -17,7 +17,10 @@ pub struct FloatGenerator<N>(PhantomData<N>);
 /// or [`uniform_f64s`](fn.uniform_f64s.html)
 pub struct UniformFloatGenerator<N>(PhantomData<N>);
 /// See [`vecs`](fn.vecs.html)
-pub struct VecGenerator<G>(G, usize);
+pub struct VecGenerator<G> {
+    inner: G,
+    mean_length: usize,
+}
 /// See [`info_pools`](fn.info_pools.html)
 pub struct InfoPoolGenerator(usize);
 /// See [`weighted_coin`](fn.weighted_coin.html)
@@ -119,13 +122,16 @@ pub fn booleans() -> BoolGenerator {
 
 /// Generates vectors with items given by `inner`.
 pub fn vecs<G>(inner: G) -> VecGenerator<G> {
-    VecGenerator(inner, 4)
+    VecGenerator {
+        inner: inner,
+        mean_length: 10,
+    }
 }
 
 impl<G> VecGenerator<G> {
     /// Specify the mean length of the vector.
     pub fn mean_length(mut self, mean: usize) -> Self {
-        self.1 = mean;
+        self.mean_length = mean;
         self
     }
 }
@@ -180,12 +186,11 @@ where
 impl<G: Generator> Generator for VecGenerator<G> {
     type Item = Vec<G::Item>;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
-        let &VecGenerator(ref inner, ref mean) = self;
         let mut result = Vec::new();
-        let p_is_final = 1.0 / (1.0 + *mean as f32);
+        let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
         let bs = weighted_coin(1.0 - p_is_final);
         while bs.generate(src)? {
-            let item = inner.generate(src)?;
+            let item = self.inner.generate(src)?;
             result.push(item)
         }
 
