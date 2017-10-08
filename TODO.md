@@ -5,8 +5,10 @@
   * [X] Floats
   * [X] Result
   * [X] Weighted coin
-  * [X] Collections
-    * [ ] Min/max/average lengths via reservoir-esque sampling
+  * Collections
+    * [X] Average lengths via reservoir-esque sampling
+    * [ ] Min lengths
+    * [ ] Max
   * [X] Argument emulation via tuple of generator is a generator of tuples
   * combinators
     * [X] filter
