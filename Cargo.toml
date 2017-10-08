@@ -5,6 +5,7 @@ name = "suppositions"
 version = "0.1.0"
 repository = "https://github.com/cstorey/suppositions"
 documentation = "https://docs.rs/suppositions"
+description = "Property testing with automagic shrinking."
 
 [dependencies]
 env_logger = "0.4.3"
