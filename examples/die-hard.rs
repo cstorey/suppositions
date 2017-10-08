@@ -1,4 +1,5 @@
 extern crate suppositions;
+extern crate env_logger;
 use std::cmp::min;
 use suppositions::*;
 use suppositions::generators::*;
@@ -75,6 +76,8 @@ fn ops() -> Box<Generator<Item = Op>> {
 }
 
 fn main() {
+    env_logger::init().expect("env_logger::init");
+
     property(vecs(ops()).mean_length(1000)).check(|xs| {
         let mut sts = Vec::new();
         let mut st = State::default();
