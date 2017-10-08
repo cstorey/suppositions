@@ -5,6 +5,7 @@ extern crate env_logger;
 use suppositions::*;
 use suppositions::generators::*;
 
+fn _assert_is_generator<G: Generator>(_: &G) {}
 
 #[test]
 fn i64s_should_generate_same_output_given_same_input() {
@@ -147,4 +148,17 @@ fn one_of_should_partially_order_same_as_source() {
                 Ok((p0, p1, v0, v1))
             }),
     ).check(|(_, _, v0, v1)| v0 <= v1)
+}
+
+#[test]
+fn boxed_generator_yields_same_as_inner_value() {
+    env_logger::init().unwrap_or(());
+    let orig = u64s();
+    let boxed = u64s().boxed();
+    _assert_is_generator(&boxed);
+    property(info_pools(16).filter_map(|p| {
+        let v0 = orig.generate_from(&p)?;
+        let v1 = boxed.generate_from(&p)?;
+        Ok((v0, v1))
+    })).check(|(v0, v1)| v0 == v1)
 }

@@ -87,6 +87,26 @@ pub trait Generator {
     }
 }
 
+/// An extension trait that allows use of methods that assume Self has a known
+/// size.
+pub trait GeneratorSized {
+    /// See [`Generator::Item`](trait.Generator.html#associatedtype.Item)
+    type Item;
+    /// Returns a boxed trait object. Useful for returning a series of chained
+    /// combinators without having to declare the full type.
+    fn boxed(self) -> Box<Generator<Item = Self::Item>>;
+}
+
+impl<G> GeneratorSized for G
+where
+    G: Generator + 'static,
+{
+    type Item = G::Item;
+    fn boxed(self) -> Box<Generator<Item = Self::Item>> {
+        Box::new(self)
+    }
+}
+
 /// Generates boolean value with a 50% chance of being true.
 pub fn booleans() -> BoolGenerator {
     BoolGenerator
@@ -393,6 +413,12 @@ impl<G: Generator, H: Generator> Generator for (G, H) {
     }
 }
 
+impl<T> Generator for Box<Generator<Item = T>> {
+    type Item = T;
+    fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
+        (**self).generate(src)
+    }
+}
 /// Allows the user to use one of a set of alternative generators.
 /// Often useful when you need to generate elements of an enum.
 ///

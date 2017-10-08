@@ -22,7 +22,7 @@ pub trait CheckResult {
 }
 
 /// This is the main entry point for users of the library.
-pub fn property<G>(gen: G) -> Property<G> {
+pub fn property<G: Generator>(gen: G) -> Property<G> {
     Property { gen: gen }
 }
 
@@ -30,7 +30,8 @@ impl<G: Generator> Property<G>
 where
     G::Item: fmt::Debug,
 {
-    /// Use this function to sepecify the thing you wish to check.
+    /// Use this function to sepecify the thing you wish to check. Because we include the
+    /// debug representation of the input and the output within the
     pub fn check<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(self, subject: F) {
         let mut tests_run = 0usize;
         let mut items_skipped = 0usize;
