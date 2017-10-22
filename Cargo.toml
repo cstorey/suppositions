@@ -6,6 +6,7 @@ version = "0.1.2"
 repository = "https://github.com/cstorey/suppositions"
 documentation = "https://docs.rs/suppositions"
 description = "Property testing with automagic shrinking."
+readme = "README.md"
 
 [dependencies]
 log = "0.3.8"
