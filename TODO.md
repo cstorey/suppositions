@@ -27,6 +27,9 @@
 * [X] Auto size pool (lazily create pool from rand source and cache into Vec)
   * Return zeroes (like theft) at end of input?
     * This may need to vary between first-run (extend with random) and shrinking (zero fill)
+## 0.1.2
+
+* Shrink via removal on power-of two boundaries.
 
 ## ???
 * Generators

@@ -1,4 +1,6 @@
 extern crate suppositions;
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 use std::cmp::min;
 use suppositions::*;
@@ -81,6 +83,7 @@ fn main() {
         .num_tests(10000)
         .property(vecs(ops()).mean_length(1000))
         .check(|xs| {
+            debug!("Testing: {:?}", xs);
             let mut sts = Vec::new();
             let mut st = State::default();
             for o in xs.iter() {
@@ -88,9 +91,11 @@ fn main() {
                 sts.push((o.clone(), st.clone()));
                 st.assert_invariants();
                 if st.finished() {
+                    debug!("Success! {:?}", st);
                     return Err(st);
                 }
             }
+            debug!("No result");
             return Ok(());
         });
 

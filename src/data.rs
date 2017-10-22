@@ -8,6 +8,7 @@
 use std::fmt;
 use hex_slice::AsHex;
 use rand::{random, Rng, XorShiftRng};
+use std::cmp::min;
 
 /// A pool of data that we can draw upon to generate other types of data.
 #[derive(Clone, PartialEq)]
@@ -129,13 +130,21 @@ fn minimize_via_removal<F: Fn(InfoReplay) -> bool>(
 ) -> Option<InfoPool> {
     // First shrink tactic: item removal
     trace!("minimizing by removal: {:?}", p);
+    if p.data.len() == 0 {
+        return None;
+    }
+
     let max_pow = 0usize.count_zeros();
     let pow = max_pow - p.data.len().leading_zeros();
     for granularity in 0..pow {
-        let width = p.data.len() >> granularity;
+        let width = 1 << (pow - granularity);
         for chunk in 0..(1 << granularity) {
-            let start = chunk * width;
-            let end = start + width;
+            let start = min(chunk * width, p.data.len());
+            let end = min(start + width, p.data.len());
+            if start == end {
+                break;
+            }
+
             candidate.data.clear();
             candidate.data.extend(&p.data[0..start]);
             candidate.data.extend(&p.data[end..]);
