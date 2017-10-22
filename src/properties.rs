@@ -78,9 +78,9 @@ where
         let mut tests_run = 0usize;
         let mut items_skipped = 0usize;
         while tests_run < self.config.num_tests {
-            let pool = InfoPool::random_of_size(DEFAULT_POOL_SIZE);
+            let mut pool = InfoPool::random_of_size(DEFAULT_POOL_SIZE);
             trace!("Tests run: {}; skipped:{}", tests_run, items_skipped);
-            match self.gen.generate(&mut pool.replay()) {
+            match self.gen.generate(&mut pool.tap()) {
                 Ok(arg) => {
                     let res = Self::attempt(&subject, arg);
                     trace!(
