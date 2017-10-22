@@ -22,6 +22,12 @@
   * [X] unit
 * [X] Catch panics and extract panic message
 
+## 0.1.1
+* [X] Configure number of runs/discards
+* [X] Auto size pool (lazily create pool from rand source and cache into Vec)
+  * Return zeroes (like theft) at end of input?
+    * This may need to vary between first-run (extend with random) and shrinking (zero fill)
+
 ## ???
 * Generators
   * Collections
@@ -32,11 +38,6 @@
   * [ ] http://matt.might.net/articles/quick-quickcheck/
   * [ ] https://github.com/BurntSushi/quickcheck
   * [ ] https://github.com/hedgehogqa/haskell-hedgehog/tree/master/hedgehog-example/test/Test/Example
-* [X] Configure number of runs/discards
-* [ ] Confgigure pool size (still an arbitrarily specified value)
-* [ ] Auto size pool (lazily create pool from rand source and cache into Vec)
-  * Return zeroes (like theft) at end of input?
-    * This may need to vary between first-run (extend with random) and shrinking (zero fill)
 * [ ]  Avoid re-testing the same value
   * [ ] Keep previous value around; compare against it.
   * [ ] (eg: via scalable bloom/Cuckoo filters)
