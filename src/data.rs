@@ -172,7 +172,9 @@ fn minimize_via_scalar_shrink<F: Fn(InfoReplay) -> bool>(
     for i in 0..p.data.len() {
         candidate.clone_from(&p);
 
-        for bitoff in 0..8 {
+        let max_pow = 0u8.count_zeros();
+        let pow = max_pow - p.data[i].leading_zeros();
+        for bitoff in 0..pow {
             candidate.data[i] = p.data[i] - (p.data[i] >> bitoff);
             trace!(
                 "shrunk item -(bitoff:{}) {} {}->{}: {:?}",
