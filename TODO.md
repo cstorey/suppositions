@@ -32,6 +32,8 @@
 * Shrink via removal on power-of two boundaries.
 
 ## ???
+
+* [ ] N-ary tuples
 * Generators
   * Collections
     * [ ] Min lengths
