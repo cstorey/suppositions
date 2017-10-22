@@ -39,8 +39,6 @@ pub enum DataError {
     SkipItem,
 }
 
-/// A convenience alias for generators that use the pool.
-pub type Maybe<T> = Result<T, DataError>;
 
 impl InfoPool {
     /// Create an `InfoPool` with a given vector of bytes. (Mostly used for
@@ -81,10 +79,10 @@ impl InfoPool {
 impl<'a> InfoTap<'a> {
     /// Consumes the next byte from this tap. Returns `Ok(x)` if successful,
     /// or `Err(DataError::PoolExhausted)` if we have reached the end.
-    pub fn next_byte(&mut self) -> Maybe<u8> {
+    pub fn next_byte(&mut self) -> u8 {
         let res = self.data.get(self.off).cloned();
         self.off += 1;
-        res.ok_or(DataError::PoolExhausted)
+        res.unwrap_or(0)
     }
 }
 
@@ -92,7 +90,7 @@ impl<'a> InfoTap<'a> {
 impl<'a> Iterator for InfoTap<'a> {
     type Item = u8;
     fn next(&mut self) -> Option<u8> {
-        self.next_byte().ok()
+        Some(self.next_byte())
     }
 }
 
@@ -215,17 +213,18 @@ pub fn minimize<F: Fn(InfoTap) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPo
 
 #[cfg(test)]
 mod tests {
+    extern crate env_logger;
     use super::*;
 
     #[test]
     fn should_take_each_item_in_pool() {
         let p = InfoPool::of_vec(vec![0, 1, 2, 3]);
         let mut t = p.tap();
-        assert_eq!(t.next_byte(), Ok(0));
-        assert_eq!(t.next_byte(), Ok(1));
-        assert_eq!(t.next_byte(), Ok(2));
-        assert_eq!(t.next_byte(), Ok(3));
-        assert_eq!(t.next_byte(), Err(DataError::PoolExhausted));
+        assert_eq!(t.next_byte(), 0);
+        assert_eq!(t.next_byte(), 1);
+        assert_eq!(t.next_byte(), 2);
+        assert_eq!(t.next_byte(), 3);
+        assert_eq!(t.next_byte(), 0);
     }
 
     #[test]
@@ -234,9 +233,9 @@ mod tests {
         let p = InfoPool::random_of_size(size);
         let mut t = p.tap();
         for _ in 0..size {
-            assert!(t.next_byte().is_ok());
+            let _ = t.next_byte();
         }
-        assert!(t.next_byte().is_err());
+        assert_eq!(t.next_byte(), 0);
     }
 
     #[test]
@@ -244,14 +243,14 @@ mod tests {
         let p = InfoPool::random_of_size(4);
         let mut t = p.tap();
         let mut v0 = Vec::new();
-        while let Ok(val) = t.next_byte() {
-            v0.push(val)
+        for _ in 0..4 {
+            v0.push(t.next_byte())
         }
 
         let mut t = p.tap();
         let mut v1 = Vec::new();
-        while let Ok(val) = t.next_byte() {
-            v1.push(val)
+        for _ in 0..4 {
+            v1.push(t.next_byte())
         }
 
         assert_eq!(v0, v1)
@@ -269,7 +268,7 @@ mod tests {
         let p = InfoPool::of_vec(buf.clone());
         let _: &Iterator<Item = u8> = &p.tap();
 
-        assert_eq!(p.tap().collect::<Vec<_>>(), buf)
+        assert_eq!(p.tap().take(4).collect::<Vec<_>>(), buf)
     }
     #[test]
     fn minimiser_should_minimise_to_empty() {
@@ -281,38 +280,39 @@ mod tests {
 
     #[test]
     fn minimiser_should_minimise_to_minimum_given_size() {
-        let p = InfoPool::of_vec(vec![0; 4]);
-        let min = minimize(&p, &|t| t.count() > 1).expect("some smaller pool");
+        env_logger::init().unwrap_or(());
+        let p = InfoPool::of_vec(vec![1; 4]);
+        let min = minimize(&p, &|t| t.take(16).filter(|&v| v > 0).count() > 1).expect("some smaller pool");
 
-        assert_eq!(min.buffer(), &[0, 0])
+        assert_eq!(min.buffer(), &[1, 1])
     }
 
     #[test]
     fn minimiser_should_minimise_scalar_values() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|mut t| t.any(|v| v >= 3)).expect("some smaller pool");
+        let min = minimize(&p, &|t| t.take(16).any(|v| v >= 3)).expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[3])
     }
     #[test]
-    fn minimiser_should_minimise_scalar_values_to_zero() {
+    fn minimiser_should_minimise_scalar_values_to_empty() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|mut t| t.any(|_| true)).expect("some smaller pool");
+        let min = minimize(&p, &|t| t.take(16).any(|_| true)).expect("some smaller pool");
 
-        assert_eq!(min.buffer(), &[0])
+        assert_eq!(min.buffer(), &[] as &[u8])
     }
 
     #[test]
     fn minimiser_should_minimise_scalar_values_by_search() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|mut t| t.any(|v| v >= 13)).expect("some smaller pool");
+        let min = minimize(&p, &|t| t.take(16).any(|v| v >= 13)).expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[13])
     }
     #[test]
     fn minimiser_should_minimise_scalar_values_accounting_for_overflow() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|mut t| t.any(|v| v >= 251)).expect("some smaller pool");
+        let min = minimize(&p, &|t| t.take(16).any(|v| v >= 251)).expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[251])
     }

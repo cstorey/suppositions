@@ -6,6 +6,9 @@ use std::iter;
 
 use data::*;
 
+/// A convenience alias for generators that use the pool.
+pub type Maybe<T> = Result<T, DataError>;
+
 /// See [`booleans`](fn.booleans.html).
 pub struct BoolGenerator;
 /// See [`u64s`](fn.u64s.html), [`i64s`](fn.i64s.html), etc.
@@ -215,7 +218,7 @@ impl Generator for InfoPoolGenerator {
 impl Generator for BoolGenerator {
     type Item = bool;
     fn generate(&self, src: &mut InfoTap) -> Maybe<Self::Item> {
-        src.next_byte().map(|next| next >= 0x80)
+        Ok(src.next_byte() >= 0x80)
     }
 }
 
@@ -233,9 +236,8 @@ macro_rules! unsigned_integer_gen {
                 let nbytes = size_of::<$ty>() / size_of::<u8>();
                 let mut val: $ty = 0;
                 for _ in 0..nbytes {
-                    val = val.wrapping_shl(8) | src.next_byte()? as $ty;
+                    val = val.wrapping_shl(8) | src.next_byte() as $ty;
                 }
-                // src.next_byte().map(|next| next >= 0x80)
                 Ok(val)
             }
         }
@@ -363,9 +365,9 @@ impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
         let &ResultGenerator(ref ok, ref err) = self;
         let bs = booleans();
         let result = if bs.generate(src)? {
-            Ok(ok.generate(src)?)
-        } else {
             Err(err.generate(src)?)
+        } else {
+            Ok(ok.generate(src)?)
         };
 
         Ok(result)
