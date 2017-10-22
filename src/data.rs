@@ -68,7 +68,7 @@ impl InfoPool {
     }
 
     /// Creates a tap that allows drawing information from this pool.
-    pub fn tap(&self) -> InfoTap {
+    pub fn replay(&self) -> InfoTap {
         InfoTap {
             data: &*self.data,
             off: 0,
@@ -112,7 +112,7 @@ fn minimize_via_removal<F: Fn(InfoTap) -> bool>(
             candidate.data.extend(&p.data[0..start]);
             candidate.data.extend(&p.data[end..]);
 
-            let test = pred(candidate.tap());
+            let test = pred(candidate.replay());
             trace!(
                 "removed {},{}: {:?}; test result {}",
                 start,
@@ -160,7 +160,7 @@ fn minimize_via_scalar_shrink<F: Fn(InfoTap) -> bool>(
                 continue;
             }
 
-            let test = pred(candidate.tap());
+            let test = pred(candidate.replay());
             trace!("test result {}", test);
             if test {
                 if let Some(res) = minimize(&candidate, pred) {
@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn should_take_each_item_in_pool() {
         let p = InfoPool::of_vec(vec![0, 1, 2, 3]);
-        let mut t = p.tap();
+        let mut t = p.replay();
         assert_eq!(t.next_byte(), 0);
         assert_eq!(t.next_byte(), 1);
         assert_eq!(t.next_byte(), 2);
@@ -231,7 +231,7 @@ mod tests {
     fn should_generate_random_data_of_size() {
         let size = 100;
         let p = InfoPool::random_of_size(size);
-        let mut t = p.tap();
+        let mut t = p.replay();
         for _ in 0..size {
             let _ = t.next_byte();
         }
@@ -241,13 +241,13 @@ mod tests {
     #[test]
     fn should_allow_restarting_read() {
         let p = InfoPool::random_of_size(4);
-        let mut t = p.tap();
+        let mut t = p.replay();
         let mut v0 = Vec::new();
         for _ in 0..4 {
             v0.push(t.next_byte())
         }
 
-        let mut t = p.tap();
+        let mut t = p.replay();
         let mut v1 = Vec::new();
         for _ in 0..4 {
             v1.push(t.next_byte())
@@ -266,9 +266,9 @@ mod tests {
     fn tap_can_act_as_iterator() {
         let buf = vec![4, 3, 2, 1];
         let p = InfoPool::of_vec(buf.clone());
-        let _: &Iterator<Item = u8> = &p.tap();
+        let _: &Iterator<Item = u8> = &p.replay();
 
-        assert_eq!(p.tap().take(4).collect::<Vec<_>>(), buf)
+        assert_eq!(p.replay().take(4).collect::<Vec<_>>(), buf)
     }
     #[test]
     fn minimiser_should_minimise_to_empty() {
@@ -282,7 +282,8 @@ mod tests {
     fn minimiser_should_minimise_to_minimum_given_size() {
         env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec(vec![1; 4]);
-        let min = minimize(&p, &|t| t.take(16).filter(|&v| v > 0).count() > 1).expect("some smaller pool");
+        let min = minimize(&p, &|t| t.take(16).filter(|&v| v > 0).count() > 1)
+            .expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[1, 1])
     }

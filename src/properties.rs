@@ -80,12 +80,12 @@ where
         while tests_run < self.config.num_tests {
             let pool = InfoPool::random_of_size(DEFAULT_POOL_SIZE);
             trace!("Tests run: {}; skipped:{}", tests_run, items_skipped);
-            match self.gen.generate(&mut pool.tap()) {
+            match self.gen.generate(&mut pool.replay()) {
                 Ok(arg) => {
                     let res = Self::attempt(&subject, arg);
                     trace!(
                         "Result: {:?} -> {:?}",
-                        self.gen.generate(&mut pool.tap()),
+                        self.gen.generate(&mut pool.replay()),
                         res
                     );
                     tests_run += 1;
@@ -97,13 +97,13 @@ where
                         );
                         panic!(
                             "Predicate failed for argument {:?}; check returned {:?}",
-                            self.gen.generate(&mut minpool.tap()),
+                            self.gen.generate(&mut minpool.replay()),
                             res
                         )
                     }
                 }
                 Err(DataError::SkipItem) => {
-                    trace!("Skip: {:?}", self.gen.generate(&mut pool.tap()));
+                    trace!("Skip: {:?}", self.gen.generate(&mut pool.replay()));
                     items_skipped += 1;
                     if items_skipped >= self.config.max_skips {
                         panic!(
@@ -115,7 +115,7 @@ where
                     }
                 }
                 Err(e) => {
-                    trace!("Gen failure: {:?}", self.gen.generate(&mut pool.tap()));
+                    trace!("Gen failure: {:?}", self.gen.generate(&mut pool.replay()));
                     debug!("{:?}", e);
                 }
             }

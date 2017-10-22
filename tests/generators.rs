@@ -25,8 +25,8 @@ fn i64s_should_partially_order_same_as_source() {
         (info_pools(16), info_pools(16))
             .filter(|&(ref p0, ref p1)| p0.buffer() < p1.buffer())
             .filter_map(|(p0, p1)| {
-                gen.generate(&mut p0.tap()).and_then(|v0| {
-                    gen.generate(&mut p1.tap()).map(|v1| (v0, v1))
+                gen.generate(&mut p0.replay()).and_then(|v0| {
+                    gen.generate(&mut p1.replay()).map(|v1| (v0, v1))
                 })
             }),
     ).check(|(v0, v1)| v0.abs() <= v1.abs())
