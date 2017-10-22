@@ -1,12 +1,12 @@
 ## 0.1.0
 
-* [ ] Generators
+* Generators
   * [X] Integers & other Primitives
   * [X] Floats
   * [X] Result
   * [X] Weighted coin
-  * [X] Collections
-    * [ ] Min/max/average lengths via reservoir-esque sampling
+  * Collections
+    * [X] Average lengths via reservoir-esque sampling
   * [X] Argument emulation via tuple of generator is a generator of tuples
   * combinators
     * [X] filter
@@ -19,19 +19,24 @@
 * [ ] TestResult trait for
   * [X] bool.
   * [X] Result.
-  * [ ] unit
-* [ ] Catch panics and extract panic message
+  * [X] unit
+* [X] Catch panics and extract panic message
 
 ## ???
-
+* Generators
+  * Collections
+    * [ ] Min lengths
+    * [ ] Max
 * [ ] Examples ("inspired" by hedgehog/hypothesis/etc)
   * [ ] https://begriffs.com/posts/2017-01-14-design-use-quickcheck.html?hn=1
   * [ ] http://matt.might.net/articles/quick-quickcheck/
   * [ ] https://github.com/BurntSushi/quickcheck
   * [ ] https://github.com/hedgehogqa/haskell-hedgehog/tree/master/hedgehog-example/test/Test/Example
-* [ ] Configure number of runs/discards
+* [X] Configure number of runs/discards
 * [ ] Confgigure pool size (still an arbitrarily specified value)
 * [ ] Auto size pool (lazily create pool from rand source and cache into Vec)
+  * Return zeroes (like theft) at end of input?
+    * This may need to vary between first-run (extend with random) and shrinking (zero fill)
 * [ ]  Avoid re-testing the same value
   * [ ] Keep previous value around; compare against it.
   * [ ] (eg: via scalable bloom/Cuckoo filters)
