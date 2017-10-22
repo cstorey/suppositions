@@ -2,7 +2,7 @@
 authors = ["Ceri Storey <cez@necrofish.org.uk>"]
 license = "Apache-2.0"
 name = "suppositions"
-version = "0.1.0"
+version = "0.1.1"
 repository = "https://github.com/cstorey/suppositions"
 documentation = "https://docs.rs/suppositions"
 description = "Property testing with automagic shrinking."
