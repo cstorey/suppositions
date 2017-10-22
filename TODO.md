@@ -32,7 +32,7 @@
   * [ ] http://matt.might.net/articles/quick-quickcheck/
   * [ ] https://github.com/BurntSushi/quickcheck
   * [ ] https://github.com/hedgehogqa/haskell-hedgehog/tree/master/hedgehog-example/test/Test/Example
-* [ ] Configure number of runs/discards
+* [X] Configure number of runs/discards
 * [ ] Confgigure pool size (still an arbitrarily specified value)
 * [ ] Auto size pool (lazily create pool from rand source and cache into Vec)
   * Return zeroes (like theft) at end of input?
