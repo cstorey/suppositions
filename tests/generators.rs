@@ -3,15 +3,9 @@ extern crate log;
 extern crate env_logger;
 
 use suppositions::*;
-use suppositions::data::InfoPool;
 use suppositions::generators::*;
 
 fn _assert_is_generator<G: Generator>(_: &G) {}
-
-fn info_pools(size: usize) -> Box<Generator<Item = InfoPool>> {
-    let g = vecs(u8s()).mean_length(size).map(|v| InfoPool::of_vec(v));
-    Box::new(g)
-}
 
 #[test]
 fn i64s_should_generate_same_output_given_same_input() {

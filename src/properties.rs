@@ -5,8 +5,6 @@ use std::panic;
 use data::*;
 use generators::*;
 
-const DEFAULT_POOL_SIZE: usize = 1024;
-
 /// Configuration that allows the user to override how many tests, skipped-tests etc.
 /// are permitted.
 #[derive(Debug, Clone)]
@@ -78,7 +76,7 @@ where
         let mut tests_run = 0usize;
         let mut items_skipped = 0usize;
         while tests_run < self.config.num_tests {
-            let mut pool = InfoPool::random_of_size(DEFAULT_POOL_SIZE);
+            let mut pool = InfoPool::new();
             trace!("Tests run: {}; skipped:{}", tests_run, items_skipped);
             match self.gen.generate(&mut pool.tap()) {
                 Ok(arg) => {

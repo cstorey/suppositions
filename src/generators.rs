@@ -25,10 +25,8 @@ pub struct VecGenerator<G> {
     mean_length: usize,
 }
 
-/*
 /// See [`info_pools`](fn.info_pools.html)
 pub struct InfoPoolGenerator(usize);
-*/
 /// See [`weighted_coin`](fn.weighted_coin.html)
 pub struct WeightedCoinGenerator(f32);
 /// See [`optional`](fn.optional.html)
@@ -148,11 +146,9 @@ pub fn consts<V: Clone>(val: V) -> Const<V> {
 }
 
 /// Randomly generates an info-pool (mostly used for testing generators).
-/*
-pub fn no__info_pools(len: usize) -> InfoPoolGenerator {
+pub fn info_pools(len: usize) -> InfoPoolGenerator {
     InfoPoolGenerator(len)
 }
-*/
 /// Generates a boolean with the specified probability (0.0 <= p <= 1.0) of being true.
 pub fn weighted_coin(p: f32) -> WeightedCoinGenerator {
     WeightedCoinGenerator(p)
@@ -205,10 +201,9 @@ impl<G: Generator> Generator for VecGenerator<G> {
     }
 }
 
-/*
 impl Generator for InfoPoolGenerator {
     type Item = InfoPool;
-    fn generate(&self, src: &mut Iterator<Item=u8>) -> Maybe<Self::Item> {
+    fn generate(&self, src: &mut Iterator<Item = u8>) -> Maybe<Self::Item> {
         let mut result = Vec::new();
         let vals = u8s();
         for _ in 0..self.0 {
@@ -219,7 +214,6 @@ impl Generator for InfoPoolGenerator {
         Ok(InfoPool::of_vec(result))
     }
 }
-*/
 
 impl Generator for BoolGenerator {
     type Item = bool;
@@ -510,7 +504,7 @@ pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(
 #[cfg(test)]
 mod tests {
     extern crate env_logger;
-    use rand::random;
+    use rand::{random, Rng};
     use std::iter;
     use std::fmt;
     use super::*;
@@ -520,6 +514,14 @@ mod tests {
     fn gen_random_vec() -> Vec<u8> {
         (0..SHORT_VEC_SIZE).map(|_| random()).collect::<Vec<u8>>()
     }
+
+    /// Create an `InfoPool` with a `size` length vector of random bytes
+    /// using the generator `rng`. (Mostly used for testing).
+    fn unseeded_of_size(size: usize) -> InfoPool {
+        let mut rng = ::rand::XorShiftRng::new_unseeded();
+        InfoPool::of_vec((0..size).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>())
+    }
+
 
     fn should_generate_same_output_given_same_input<G: Generator>(gen: G)
     where
@@ -634,8 +636,8 @@ mod tests {
     {
         let mut p;
         loop {
-            p = InfoPool::random_of_size(SHORT_VEC_SIZE);
-            match gen.generate(&mut p.replay()) {
+            p = InfoPool::new();
+            match gen.generate(&mut p.tap()) {
                 Ok(_) => break,
                 Err(DataError::SkipItem) => (),
                 Err(DataError::PoolExhausted) => panic!("Not enough pool to generate data"),
@@ -695,7 +697,6 @@ mod tests {
         );
     }
 
-    /*
     #[test]
     fn info_pools_should_generate_same_output_given_same_input() {
         should_generate_same_output_given_same_input(info_pools(8))
@@ -713,7 +714,6 @@ mod tests {
         // This is perhaps not the best idea ever; but it'll do for now.
         should_minimize_to(info_pools(8), InfoPool::of_vec(vec![0; 8]))
     }
-    */
 
     #[test]
     fn u8s_should_generate_same_output_given_same_input() {
@@ -818,21 +818,20 @@ mod tests {
     #[test]
     fn filter_should_pass_through_when_true() {
         let gen = consts(()).filter(|&_| true);
-        let p = InfoPool::random_of_size(4);
+        let p = InfoPool::new();
         assert_eq!(gen.generate(&mut p.replay()), Ok(()));
     }
 
     #[test]
     fn filter_should_skip_when_false() {
         let gen = consts(()).filter(|&_| false);
-        let p = InfoPool::random_of_size(4);
+        let p = InfoPool::new();
         assert_eq!(gen.generate(&mut p.replay()), Err(DataError::SkipItem));
     }
 
     #[test]
     fn biased_coin() {
-        let mut rng = ::rand::XorShiftRng::new_unseeded();
-        let p = InfoPool::from_random_of_size(&mut rng, 1024);
+        let p = unseeded_of_size(1024);
         let gen = weighted_coin(1.0 / 3.0);
         let trials = 256;
         let expected = trials / 3;
@@ -840,7 +839,10 @@ mod tests {
         let mut heads = 0;
         let mut t = p.replay();
         for _ in 0..trials {
-            if gen.generate(&mut t).expect("a trial") {
+            if gen.generate(&mut t as &mut Iterator<Item = u8>).expect(
+                "a trial",
+            )
+            {
                 heads += 1;
             }
         }
@@ -859,7 +861,7 @@ mod tests {
     fn filter_map_should_pass_through_when_ok() {
         let gen = consts(()).filter_map(|()| Ok(42usize));
         let _: &Generator<Item = usize> = &gen;
-        let p = InfoPool::random_of_size(4);
+        let p = InfoPool::new();
         assert_eq!(gen.generate_from(&p), Ok(42));
     }
 
@@ -867,13 +869,12 @@ mod tests {
     fn filter_map_should_skip_when_err() {
         let gen = consts(()).filter_map(|()| Err(DataError::SkipItem));
         let _: &Generator<Item = usize> = &gen;
-        let p = InfoPool::random_of_size(4);
+        let p = InfoPool::new();
         assert_eq!(gen.generate_from(&p), Err(DataError::SkipItem));
     }
 
     mod vector_lengths {
         use super::*;
-        use data::InfoPool;
         use std::collections::BTreeMap;
 
         #[test]
@@ -903,15 +904,16 @@ mod tests {
         fn mean_length_can_be_set_as(len: usize) {
             env_logger::init().unwrap_or(());
             let gen = vecs(u8s()).mean_length(len);
-            let mut rng = ::rand::XorShiftRng::new_unseeded();
             let trials = 1024usize;
             let expected = len as f64;
             let allowed_error = expected * 0.1;
             let mut lengths = BTreeMap::new();
-            let p = InfoPool::from_random_of_size(&mut rng, 1 << 18);
+            let p = unseeded_of_size(1 << 18);
             let mut t = p.replay();
             for _ in 0..trials {
-                let val = gen.generate(&mut t).expect("a trial");
+                let val = gen.generate(&mut t as &mut Iterator<Item = u8>).expect(
+                    "a trial",
+                );
                 *lengths.entry(val.len()).or_insert(0) += 1;
             }
 
@@ -932,7 +934,6 @@ mod tests {
     }
     mod collection_lengths {
         use super::*;
-        use data::InfoPool;
         use std::collections::{BTreeMap, LinkedList};
 
         #[test]
@@ -962,12 +963,11 @@ mod tests {
         fn mean_length_can_be_set_as(len: usize) {
             env_logger::init().unwrap_or(());
             let gen = collections::<LinkedList<_>, _>(u8s()).mean_length(len);
-            let mut rng = ::rand::XorShiftRng::new_unseeded();
             let trials = 1024usize;
             let expected = len as f64;
             let allowed_error = expected * 0.1;
             let mut lengths = BTreeMap::new();
-            let p = InfoPool::from_random_of_size(&mut rng, 1 << 18);
+            let p = unseeded_of_size(1 << 18);
             let mut t = p.replay();
             for _ in 0..trials {
                 let val = gen.generate(&mut t).expect("a trial");

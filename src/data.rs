@@ -7,10 +7,10 @@
 
 use std::fmt;
 use hex_slice::AsHex;
-use rand::{random, Rng, Rand, XorShiftRng};
+use rand::{random, Rng, XorShiftRng};
 
 /// A pool of data that we can draw upon to generate other types of data.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct InfoPool {
     data: Vec<u8>,
 }
@@ -53,11 +53,6 @@ impl InfoPool {
     pub fn of_vec(data: Vec<u8>) -> Self {
         InfoPool { data: data }
     }
-    /// Create an `InfoPool` with a `size` length vector of random bytes.
-    /// (Mostly used for testing).
-    pub fn random_of_size(size: usize) -> Self {
-        Self::of_vec((0..size).map(|_| random()).collect::<Vec<u8>>())
-    }
 
     /// Create an `InfoPool` with a `size` length vector of random bytes
     /// using the generator `rng`. (Mostly used for testing).
@@ -65,16 +60,6 @@ impl InfoPool {
         Self { data: Vec::new() }
     }
 
-
-    /// Create an `InfoPool` with a `size` length vector of random bytes
-    /// using the generator `rng`. (Mostly used for testing).
-    pub fn from_random_of_size<R: Rng>(rng: &mut R, size: usize) -> Self {
-        Self::of_vec(
-            (0..size)
-                .map(|_| (u64::rand(rng) >> 56) as u8)
-                .collect::<Vec<u8>>(),
-        )
-    }
 
     /// Allows access to the underlying buffer.
     pub fn buffer(&self) -> &[u8] {
@@ -293,23 +278,14 @@ mod tests {
     }
 
     #[test]
-    fn should_generate_random_data_of_size() {
-        let size = 100;
-        let p = InfoPool::random_of_size(size);
-        let mut t = p.replay();
-        for _ in 0..size {
-            let _ = t.next_byte();
-        }
-        assert_eq!(t.next_byte(), 0);
-    }
-
-    #[test]
     fn should_allow_restarting_read() {
-        let p = InfoPool::random_of_size(4);
-        let mut t = p.replay();
+        let mut p = InfoPool::new();
         let mut v0 = Vec::new();
-        for _ in 0..4 {
-            v0.push(t.next_byte())
+        {
+            let mut t = p.tap();
+            for _ in 0..4 {
+                v0.push(t.next_byte())
+            }
         }
 
         let mut t = p.replay();
