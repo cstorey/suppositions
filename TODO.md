@@ -39,10 +39,10 @@
     * [ ] Min lengths
     * [ ] Max
 * [ ] Examples ("inspired" by hedgehog/hypothesis/etc)
-  * [ ] https://begriffs.com/posts/2017-01-14-design-use-quickcheck.html?hn=1
   * [ ] http://matt.might.net/articles/quick-quickcheck/
   * [ ] https://github.com/BurntSushi/quickcheck
   * [ ] https://github.com/hedgehogqa/haskell-hedgehog/tree/master/hedgehog-example/test/Test/Example
+  * [ ] https://fsharpforfunandprofit.com/posts/property-based-testing-2/
 * [ ]  Avoid re-testing the same value
   * [ ] Keep previous value around; compare against it.
   * [ ] (eg: via scalable bloom/Cuckoo filters)
@@ -56,3 +56,7 @@
   B = someValue(); if A.generate(g) { out.emit(B.generate(g)) }`) We should
   avoid deleting A `xor` B.
 * [ ] CoArbitrary equivalent?
+
+# Implementation notes:
+## `generators::one_of`
+Rather than boxing values, maybe consider using a type-level thing? End with an impl that uses boxing (in `generators::boxed`) and a type-level induction based one (`generators::unboxed`) that sadly has horrible type errors.
