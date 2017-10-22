@@ -77,20 +77,22 @@ fn ops() -> Box<Generator<Item = Op>> {
 
 fn main() {
     env_logger::init().expect("env_logger::init");
-
-    property(vecs(ops()).mean_length(1000)).check(|xs| {
-        let mut sts = Vec::new();
-        let mut st = State::default();
-        for o in xs.iter() {
-            st.apply(o);
-            sts.push((o.clone(), st.clone()));
-            st.assert_invariants();
-            if st.finished() {
-                return Err(st);
+    CheckConfig::default()
+        .num_tests(10000)
+        .property(vecs(ops()).mean_length(1000))
+        .check(|xs| {
+            let mut sts = Vec::new();
+            let mut st = State::default();
+            for o in xs.iter() {
+                st.apply(o);
+                sts.push((o.clone(), st.clone()));
+                st.assert_invariants();
+                if st.finished() {
+                    return Err(st);
+                }
             }
-        }
-        return Ok(());
-    });
+            return Ok(());
+        });
 
     panic!("No solution found")
 }
