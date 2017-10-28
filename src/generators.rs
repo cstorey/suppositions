@@ -43,9 +43,17 @@ pub struct CollectionGenerator<C, G> {
 /// See [`one_of`](fn.one_of.html)
 pub struct OneOfGenerator<GS>(GS);
 
+/// Internal implementation for [`one_of`](fn.one_of.html). Defines the
+/// operations supported by an choice in a `one_of`.
 pub trait OneOfItem {
+    /// The generator type.
     type Item;
+    /// The number of cases reachable from this one.
     fn len(&self) -> usize;
+    /// Depending on the case selected in the
+    /// [`Generator`](trait.Generator.html) ipmlementation for
+    /// (`OneOfGenerator`)[struct.OneOfGenerator.html], we either call our
+    /// generator directly, or delegate to the next in the chain.
     fn generate_or_delegate(
         &self,
         depth: usize,
@@ -53,10 +61,13 @@ pub trait OneOfItem {
     ) -> Maybe<Self::Item>;
 }
 
+/// Internal implementation for [`one_of`](fn.one_of.html). Forms the
+/// terminating case of the induction.
 pub struct OneOfTerm<G> {
     gen: G,
 }
-// Outermost type is the last one we added.
+/// Internal implementation for [`one_of`](fn.one_of.html). Forms a
+/// left-associated chain of generators.
 pub struct OneOfSnoc<G, R> {
     rest: R,
     gen: G,
