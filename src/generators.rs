@@ -504,7 +504,7 @@ pub fn one_of<G: Generator + 'static>(inner: G) -> OneOfGenerator<OneOfTerm<G>> 
 impl<GS: OneOfItem> OneOfGenerator<GS> {
     /// Specifies an alternative data generator. See [generators::one_of](fn.one_of.html) for details.
     pub fn or<G: Generator<Item = GS::Item> + 'static>(
-        mut self,
+        self,
         other: G,
     ) -> OneOfGenerator<OneOfSnoc<G, GS>> {
         let OneOfGenerator(gs) = self;
