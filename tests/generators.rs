@@ -162,3 +162,15 @@ fn boxed_generator_yields_same_as_inner_value() {
         Ok((v0, v1))
     })).check(|(v0, v1)| v0 == v1)
 }
+
+#[test]
+fn generator_of_2_tuple() {
+    let g = (u64s(), u32s());
+    _assert_is_generator(&g);
+}
+
+#[test]
+fn generator_of_3_tuple() {
+    let g = (u64s(), u32s(), u8s());
+    _assert_is_generator(&g);
+}
