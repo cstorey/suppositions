@@ -42,6 +42,7 @@ pub struct CollectionGenerator<C, G> {
 
 /// See [`one_of`](fn.one_of.html)
 pub struct OneOfGenerator<GS>(GS);
+pub struct LazyGenerator<F>(F);
 
 /// Internal implementation for [`one_of`](fn.one_of.html). Defines the
 /// operations supported by an choice in a `one_of`.
@@ -72,7 +73,6 @@ pub struct OneOfSnoc<G, R> {
     rest: R,
     gen: G,
 }
-
 
 /// See [`Generator::filter`](trait.Generator.html#method.filter)
 pub struct Filtered<G, F>(G, F);
@@ -238,6 +238,10 @@ where
         inner: item,
         mean_length: 16,
     }
+}
+
+pub fn lazy<F: Fn() -> G, G:Generator>(thunk: F) -> LazyGenerator<F> {
+    LazyGenerator(thunk)
 }
 
 impl<G: Generator> Generator for VecGenerator<G> {
@@ -614,6 +618,14 @@ impl<GS: OneOfItem> OneOfGenerator<GS> {
             rest: gs,
         };
         OneOfGenerator(rs)
+    }
+}
+
+impl <F: Fn() -> G, G: Generator> Generator for LazyGenerator<F> {
+    type Item = G::Item;
+    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+        let g = self.0();
+        g.generate(src)
     }
 }
 

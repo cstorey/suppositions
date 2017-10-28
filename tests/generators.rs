@@ -174,3 +174,16 @@ fn generator_of_3_tuple() {
     let g = (u64s(), u32s(), u8s());
     _assert_is_generator(&g);
 }
+
+#[test]
+fn lazy_generator_yields_same_as_inner_value() {
+    env_logger::init().unwrap_or(());
+    let orig = u64s();
+    let lazy = lazy(u64s);
+    _assert_is_generator(&lazy);
+    property(info_pools(16).filter_map(|p| {
+        let v0 = orig.generate_from(&p)?;
+        let v1 = lazy.generate_from(&p)?;
+        Ok((v0, v1))
+    })).check(|(v0, v1)| v0 == v1)
+}
