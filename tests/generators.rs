@@ -150,6 +150,7 @@ fn one_of_should_partially_order_same_as_source() {
     ).check(|(_, _, v0, v1)| v0 <= v1)
 }
 
+#[cfg(never)]
 #[test]
 fn boxed_generator_yields_same_as_inner_value() {
     env_logger::init().unwrap_or(());

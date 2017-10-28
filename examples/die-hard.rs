@@ -67,21 +67,18 @@ impl State {
     }
 }
 
-fn ops() -> Box<Generator<Item = Op>> {
-    let g = one_of(consts(Op::FillSmallJug))
+fn main() {
+    env_logger::init().expect("env_logger::init");
+    let gen = one_of(consts(Op::FillSmallJug))
         .or(consts(Op::FillBigJug))
         .or(consts(Op::EmptySmallJug))
         .or(consts(Op::EmptyBigJug))
         .or(consts(Op::SmallToBig))
         .or(consts(Op::BigToSmall));
-    Box::new(g)
-}
 
-fn main() {
-    env_logger::init().expect("env_logger::init");
     CheckConfig::default()
         .num_tests(10000)
-        .property(vecs(ops()).mean_length(1000))
+        .property(vecs(gen).mean_length(1000))
         .check(|xs| {
             debug!("Testing: {:?}", xs);
             let mut sts = Vec::new();
