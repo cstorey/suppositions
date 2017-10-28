@@ -45,6 +45,8 @@
   * Collections
     * [ ] Min lengths
     * [ ] Max
+  * Recursion
+    * Helpers to limit recursion depth
 * [ ] Examples ("inspired" by hedgehog/hypothesis/etc)
   * [ ] http://matt.might.net/articles/quick-quickcheck/
   * [ ] https://github.com/BurntSushi/quickcheck
