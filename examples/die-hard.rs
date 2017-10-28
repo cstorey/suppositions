@@ -67,7 +67,7 @@ impl State {
     }
 }
 
-fn ops() -> Box<Generator<Item = Op>> {
+fn ops() -> Box<GeneratorObject<Item = Op>> {
     let g = one_of(consts(Op::FillSmallJug))
         .or(consts(Op::FillBigJug))
         .or(consts(Op::EmptySmallJug))
