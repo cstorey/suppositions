@@ -129,6 +129,49 @@ pub trait Generator {
     }
 }
 
+/// Like [`Generator`](trait.Generator.html), but allows use as a trait object.
+pub trait GeneratorObject {
+    /// The type of values that we can generate.
+    type Item;
+    /// This consumes a stream of bytes given by `source`, and generates a
+    /// value of type `Self::Item`.
+    fn generate_obj(&self, src: &mut Iterator<Item = u8>) -> Maybe<Self::Item>;
+}
+
+/// An extension trait that allows use of methods that assume Self has a known
+/// size, like `#boxed`.
+pub trait GeneratorSized {
+    /// See [`Generator::Item`](trait.Generator.html#associatedtype.Item)
+    type Item;
+    /// Returns a boxed trait object. Useful for returning a series of chained
+    /// combinators without having to declare the full type.
+    fn boxed(self) -> Box<GeneratorObject<Item = Self::Item>>;
+}
+
+impl<G> GeneratorSized for G
+where
+    G: Generator + 'static,
+{
+    type Item = G::Item;
+    fn boxed(self) -> Box<GeneratorObject<Item = Self::Item>> {
+        Box::new(self)
+    }
+}
+
+impl<G: Generator> GeneratorObject for G {
+    type Item = G::Item;
+    fn generate_obj(&self, mut src: &mut Iterator<Item = u8>) -> Maybe<Self::Item> {
+        (*self).generate(&mut src)
+    }
+}
+
+impl<T> Generator for Box<GeneratorObject<Item = T>> {
+    type Item = T;
+    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+        (**self).generate_obj(src as &mut Iterator<Item = u8>)
+    }
+}
+
 /// Generates boolean value with a 50% chance of being true.
 pub fn booleans() -> BoolGenerator {
     BoolGenerator
@@ -535,7 +578,7 @@ impl<G: Generator> OneOfItem for OneOfTerm<G> {
     fn len(&self) -> usize {
         0
     }
-    fn generate_or_delegate<I:Iterator<Item = u8>>(
+    fn generate_or_delegate<I: Iterator<Item = u8>>(
         &self,
         depth: usize,
         tap: &mut I,
@@ -905,10 +948,7 @@ mod tests {
         let mut heads = 0;
         let mut t = p.replay();
         for _ in 0..trials {
-            if gen.generate(&mut t).expect(
-                "a trial",
-            )
-            {
+            if gen.generate(&mut t).expect("a trial") {
                 heads += 1;
             }
         }
@@ -976,9 +1016,7 @@ mod tests {
             let p = unseeded_of_size(1 << 18);
             let mut t = p.replay();
             for _ in 0..trials {
-                let val = gen.generate(&mut t).expect(
-                    "a trial",
-                );
+                let val = gen.generate(&mut t).expect("a trial");
                 *lengths.entry(val.len()).or_insert(0) += 1;
             }
 
