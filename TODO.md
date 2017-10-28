@@ -41,6 +41,35 @@
 
 ## ???
 * [ ] Track which bytes (regions) are used for which generators; use this in shrinking
+      This then leaves us with the problem of ... how to keep track of usage on subsequent shrinks. Create region tracker as a wrapper?
+
+      ```rust
+      enum Extent {
+        Leaf(usize, usize), // start-end
+        Branch(Vec<Extend>),
+      }
+      struct ExtentTracker<I> {
+        src: I,
+      }
+
+      // Top level consumer
+      fn stuff() {
+        let mut tracker = ExtendTracker::new(pool.replay());
+        self.gen.generate(&mut tracker);
+        let root_extent = tracker.root();
+      }
+
+      // Consumer
+      impl<G: Generator> Generator for Foo<G> {
+        fn generate<I: Iterator<Item = u8>>(&self, src: &mut ExtentTracker<I>) -> Maybe<Self::Item> {
+          while self.new_items()? {
+            let v = self.inner.generate(&mut src.child());
+            self.chunk(v);
+          };
+          Ok(...);
+        }
+      }
+      ```
 
 ## Backlog
 
