@@ -33,7 +33,11 @@
 
 ## ???
 
-* [ ] N-ary tuples
+* [X] N-ary tuples
+* [ ] Track which bytes (regions) are used for which generators; use this in shrinking
+
+## Backlog
+
 * Generators
   * Collections
     * [ ] Min lengths
@@ -49,7 +53,6 @@
   * [ ] Make optional, to avoid extra Ord/Hash constraint
 * [ ] Stats on runs/skips/fails on random/shrinkage
 * [ ] Derive input based on trace of execution? (ie: lineage driven fault injection)
-* [ ] Track which bytes (regions) are used for which generators; use this in shrinking
 * [ ]
   Use monad vs. applicative style interfaces to infer causal relations between
   regions; Means that iff B is causally dependent upon A (eg: `A = bools();
