@@ -510,19 +510,82 @@ macro_rules! tuple_generator_impl {
     );
 }
 
-tuple_generator_impl!(ga:a:A, gb:b: B);
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C);
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D);
+tuple_generator_impl!(ga: a: A, gb: b: B);
+tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C);
+tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C, gd: d: D);
 
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D, ge:e:E);
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D, ge:e:E, gf:f: F);
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D, ge:e:E, gf:f: F, gg:g: G);
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D, ge:e:E, gf:f: F, gg:g: G, gh:h: H);
+tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C, gd: d: D, ge: e: E);
+tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C, gd: d: D, ge: e: E, gf: f: F);
+tuple_generator_impl!(
+    ga: a: A,
+    gb: b: B,
+    gc: c: C,
+    gd: d: D,
+    ge: e: E,
+    gf: f: F,
+    gg: g: G
+);
+tuple_generator_impl!(
+    ga: a: A,
+    gb: b: B,
+    gc: c: C,
+    gd: d: D,
+    ge: e: E,
+    gf: f: F,
+    gg: g: G,
+    gh: h: H
+);
 
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D, ge:e:E, gf:f: F, gg:g: G, gh:h: H, gi:i:I);
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D, ge:e:E, gf:f: F, gg:g: G, gh:h: H, gi:i:I, gj:j: J);
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D, ge:e:E, gf:f: F, gg:g: G, gh:h: H, gi:i:I, gj:j: J, gk:k:K);
-tuple_generator_impl!(ga:a:A, gb:b: B, gc:c: C, gd:d: D, ge:e:E, gf:f: F, gg:g: G, gh:h: H, gi:i:I, gj:j: J, gk:k:K, gl:l:L);
+tuple_generator_impl!(
+    ga: a: A,
+    gb: b: B,
+    gc: c: C,
+    gd: d: D,
+    ge: e: E,
+    gf: f: F,
+    gg: g: G,
+    gh: h: H,
+    gi: i: I
+);
+tuple_generator_impl!(
+    ga: a: A,
+    gb: b: B,
+    gc: c: C,
+    gd: d: D,
+    ge: e: E,
+    gf: f: F,
+    gg: g: G,
+    gh: h: H,
+    gi: i: I,
+    gj: j: J
+);
+tuple_generator_impl!(
+    ga: a: A,
+    gb: b: B,
+    gc: c: C,
+    gd: d: D,
+    ge: e: E,
+    gf: f: F,
+    gg: g: G,
+    gh: h: H,
+    gi: i: I,
+    gj: j: J,
+    gk: k: K
+);
+tuple_generator_impl!(
+    ga: a: A,
+    gb: b: B,
+    gc: c: C,
+    gd: d: D,
+    ge: e: E,
+    gf: f: F,
+    gg: g: G,
+    gh: h: H,
+    gi: i: I,
+    gj: j: J,
+    gk: k: K,
+    gl: l: L
+);
 
 /// Allows the user to use one of a set of alternative generators.
 /// Often useful when you need to generate elements of an enum.
