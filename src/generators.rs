@@ -41,7 +41,38 @@ pub struct CollectionGenerator<C, G> {
 }
 
 /// See [`one_of`](fn.one_of.html)
-pub struct OneOfGenerator<T>(Vec<Box<Generator<Item = T>>>);
+pub struct OneOfGenerator<GS>(GS);
+
+/// Internal implementation for [`one_of`](fn.one_of.html). Defines the
+/// operations supported by an choice in a `one_of`.
+pub trait OneOfItem {
+    /// The generator type.
+    type Item;
+    /// The number of cases reachable from this one.
+    fn len(&self) -> usize;
+    /// Depending on the case selected in the
+    /// [`Generator`](trait.Generator.html) ipmlementation for
+    /// (`OneOfGenerator`)[struct.OneOfGenerator.html], we either call our
+    /// generator directly, or delegate to the next in the chain.
+    fn generate_or_delegate(
+        &self,
+        depth: usize,
+        tap: &mut Iterator<Item = u8>,
+    ) -> Maybe<Self::Item>;
+}
+
+/// Internal implementation for [`one_of`](fn.one_of.html). Forms the
+/// terminating case of the induction.
+pub struct OneOfTerm<G> {
+    gen: G,
+}
+/// Internal implementation for [`one_of`](fn.one_of.html). Forms a
+/// left-associated chain of generators.
+pub struct OneOfSnoc<G, R> {
+    rest: R,
+    gen: G,
+}
+
 
 /// See [`Generator::filter`](trait.Generator.html#method.filter)
 pub struct Filtered<G, F>(G, F);
@@ -466,25 +497,65 @@ impl<T> Generator for Box<Generator<Item = T>> {
 /// }
 /// ```
 
-pub fn one_of<G: Generator + 'static>(inner: G) -> OneOfGenerator<G::Item> {
-    let inners = vec![Box::new(inner) as Box<Generator<Item = G::Item>>];
-    OneOfGenerator(inners)
+pub fn one_of<G: Generator + 'static>(inner: G) -> OneOfGenerator<OneOfTerm<G>> {
+    OneOfGenerator(OneOfTerm { gen: inner })
 }
 
-impl<T> OneOfGenerator<T> {
+impl<GS: OneOfItem> OneOfGenerator<GS> {
     /// Specifies an alternative data generator. See [generators::one_of](fn.one_of.html) for details.
-    pub fn or<G: Generator<Item = T> + 'static>(mut self, other: G) -> Self {
-        self.0.push(Box::new(other));
-        self
+    pub fn or<G: Generator<Item = GS::Item> + 'static>(
+        self,
+        other: G,
+    ) -> OneOfGenerator<OneOfSnoc<G, GS>> {
+        let OneOfGenerator(gs) = self;
+        let rs = OneOfSnoc {
+            gen: other,
+            rest: gs,
+        };
+        OneOfGenerator(rs)
     }
 }
 
-impl<T> Generator for OneOfGenerator<T> {
-    type Item = T;
+
+impl<G: Generator, R: OneOfItem<Item = G::Item>> OneOfItem for OneOfSnoc<G, R> {
+    type Item = G::Item;
+    fn len(&self) -> usize {
+        self.rest.len() + 1
+    }
+    fn generate_or_delegate(
+        &self,
+        depth: usize,
+        tap: &mut Iterator<Item = u8>,
+    ) -> Maybe<Self::Item> {
+        if depth == 0 {
+            self.gen.generate(tap)
+        } else {
+            self.rest.generate_or_delegate(depth - 1, tap)
+        }
+    }
+}
+
+impl<G: Generator> OneOfItem for OneOfTerm<G> {
+    type Item = G::Item;
+    fn len(&self) -> usize {
+        0
+    }
+    fn generate_or_delegate(
+        &self,
+        depth: usize,
+        tap: &mut Iterator<Item = u8>,
+    ) -> Maybe<Self::Item> {
+        debug_assert_eq!(depth, 0);
+        self.gen.generate(tap)
+    }
+}
+
+impl<GS: OneOfItem> Generator for OneOfGenerator<GS> {
+    type Item = GS::Item;
     fn generate(&self, src: &mut Iterator<Item = u8>) -> Maybe<Self::Item> {
-        let v = u32s().generate(src)?;
+        let v = !u32s().generate(src)?;
         let it = (v as usize * self.0.len()) >> 32;
-        self.0[it].generate(src)
+        self.0.generate_or_delegate(it, src)
     }
 }
 
