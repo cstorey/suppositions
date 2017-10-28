@@ -534,7 +534,7 @@ impl<G: Generator> OneOfItem for OneOfTerm<G> {
         depth: usize,
         tap: &mut Iterator<Item = u8>,
     ) -> Maybe<Self::Item> {
-        assert_eq!(depth, 0);
+        debug_assert_eq!(depth, 0);
         self.gen.generate(tap)
     }
 }
