@@ -639,7 +639,7 @@ impl<G: Generator, R: OneOfItem<Item = G::Item>> OneOfItem for OneOfSnoc<G, R> {
 impl<G: Generator> OneOfItem for OneOfTerm<G> {
     type Item = G::Item;
     fn len(&self) -> usize {
-        0
+        1
     }
     fn generate_or_delegate<I: Iterator<Item = u8>>(
         &self,
@@ -679,6 +679,7 @@ mod tests {
     use rand::{random, Rng};
     use std::iter;
     use std::fmt;
+    use std::collections::BTreeMap;
     use super::*;
     use data::InfoPool;
     const SHORT_VEC_SIZE: usize = 256;
@@ -1154,5 +1155,31 @@ mod tests {
                 mean
             );
         }
+    }
+
+    #[test]
+    fn one_of_should_pick_choices_relativey_evenly() {
+        env_logger::init().unwrap_or(());
+        let gen = one_of(consts(1usize)).or(consts(2)).or(consts(3));
+        let trials = 1024usize;
+        let expected = trials / 3;
+        let allowed_error = expected / 10;
+        let mut samples = BTreeMap::new();
+        let p = unseeded_of_size(1 << 18);
+        let mut t = p.replay();
+        for _ in 0..trials {
+            let val = gen.generate(&mut t).expect("a trial");
+            *samples.entry(val).or_insert(0) += 1;
+        }
+
+        println!("Histogram: {:?}", samples);
+        assert!(
+            samples.values().all(|&val| val >= (expected - allowed_error) && val <= (expected + allowed_error)),
+            "Sample counts from {} trials are all ({}+/-{}); got {:?}",
+            trials,
+            expected,
+            allowed_error,
+            samples,
+        );
     }
 }
