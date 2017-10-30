@@ -31,10 +31,12 @@
 
 * Shrink via removal on power-of two boundaries.
 
-## ???
+## 0.1.3
 
 * [X] N-ary tuples
 * [X] Avoid needing trait-objects in the main `Generator` trait, and create `GeneratorObject` to replace boxed usage.
+
+## ???
 * [ ] Track which bytes (regions) are used for which generators; use this in shrinking
 
 ## Backlog
