@@ -37,7 +37,8 @@ fn expr_gen() -> Box<GeneratorObject<Item=Expr>> {
     let lit = u8s().map(Expr::Lit);
     let add = (lazy(expr_gen), lazy(expr_gen)).map(|(a, b)| Expr::Add(Box::new(a), Box::new(b)));
 
-    one_of(lit).or(add).boxed()
+    // In lieu of having weighted choice
+    one_of(lit).or(lit).or(add).boxed()
 }
 
 #[test]
