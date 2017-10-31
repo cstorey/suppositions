@@ -10,30 +10,40 @@ use data::*;
 pub type Maybe<T> = Result<T, DataError>;
 
 /// See [`booleans`](fn.booleans.html).
+#[derive(Debug, Clone)]
 pub struct BoolGenerator;
 /// See [`u64s`](fn.u64s.html), [`i64s`](fn.i64s.html), etc.
+#[derive(Debug, Clone)]
 pub struct IntGenerator<N>(PhantomData<N>);
 /// See [`f32s`](fn.f32s.html)
 /// or [`f64s`](fn.f64s.html)
+#[derive(Debug, Clone)]
 pub struct FloatGenerator<N>(PhantomData<N>);
 /// See [`uniform_f32s`](fn.uniform_f32s.html)
 /// or [`uniform_f64s`](fn.uniform_f64s.html)
+#[derive(Debug, Clone)]
 pub struct UniformFloatGenerator<N>(PhantomData<N>);
 /// See [`vecs`](fn.vecs.html)
+#[derive(Debug, Clone)]
 pub struct VecGenerator<G> {
     inner: G,
     mean_length: usize,
 }
 
 /// See [`info_pools`](fn.info_pools.html)
+#[derive(Debug, Clone)]
 pub struct InfoPoolGenerator(usize);
 /// See [`weighted_coin`](fn.weighted_coin.html)
+#[derive(Debug, Clone)]
 pub struct WeightedCoinGenerator(f32);
 /// See [`optional`](fn.optional.html)
+#[derive(Debug, Clone)]
 pub struct OptionalGenerator<G>(G);
 /// See [`result`](fn.result.html)
+#[derive(Debug, Clone)]
 pub struct ResultGenerator<G, H>(G, H);
 /// See [`collections`](fn.collections.html)
+#[derive(Debug, Clone)]
 pub struct CollectionGenerator<C, G> {
     witness: PhantomData<C>,
     inner: G,
@@ -41,7 +51,11 @@ pub struct CollectionGenerator<C, G> {
 }
 
 /// See [`one_of`](fn.one_of.html)
+#[derive(Debug, Clone)]
 pub struct OneOfGenerator<GS>(GS);
+/// See [`lazy`](fn.lazy.html)
+#[derive(Debug, Clone)]
+pub struct LazyGenerator<F>(F);
 
 /// Internal implementation for [`one_of`](fn.one_of.html). Defines the
 /// operations supported by an choice in a `one_of`.
@@ -63,24 +77,29 @@ pub trait OneOfItem {
 
 /// Internal implementation for [`one_of`](fn.one_of.html). Forms the
 /// terminating case of the induction.
+#[derive(Debug, Clone)]
 pub struct OneOfTerm<G> {
     gen: G,
 }
 /// Internal implementation for [`one_of`](fn.one_of.html). Forms a
 /// left-associated chain of generators.
+#[derive(Debug, Clone)]
 pub struct OneOfSnoc<G, R> {
     rest: R,
     gen: G,
 }
 
-
 /// See [`Generator::filter`](trait.Generator.html#method.filter)
+#[derive(Debug, Clone)]
 pub struct Filtered<G, F>(G, F);
 /// See [`Generator::filter_map`](trait.Generator.html#method.filter_map)
+#[derive(Debug, Clone)]
 pub struct FilterMapped<G, F>(G, F);
 /// See [`Generator::map`](trait.Generator.html#method.map)
+#[derive(Debug, Clone)]
 pub struct Mapped<G, F>(G, F);
 /// See [`consts`](fn.consts.html)
+#[derive(Debug, Clone)]
 pub struct Const<V>(V);
 
 /// An object that can generate test data from an underlying data source.
@@ -238,6 +257,12 @@ where
         inner: item,
         mean_length: 16,
     }
+}
+
+/// Returns a lazily evaluated generator. The `thunk` should be pure.
+/// Mostly used to allow recursive generators.
+pub fn lazy<F: Fn() -> G, G:Generator>(thunk: F) -> LazyGenerator<F> {
+    LazyGenerator(thunk)
 }
 
 impl<G: Generator> Generator for VecGenerator<G> {
@@ -614,6 +639,14 @@ impl<GS: OneOfItem> OneOfGenerator<GS> {
             rest: gs,
         };
         OneOfGenerator(rs)
+    }
+}
+
+impl <F: Fn() -> G, G: Generator> Generator for LazyGenerator<F> {
+    type Item = G::Item;
+    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+        let g = self.0();
+        g.generate(src)
     }
 }
 

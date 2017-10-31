@@ -37,6 +37,7 @@
 * [X] Avoid needing trait-objects in the main `Generator` trait, and create `GeneratorObject` to replace boxed usage.
 
 ## ???
+* [X] `lazy` combinator to make recursion at least possible.
 * [ ] Track which bytes (regions) are used for which generators; use this in shrinking
 
 ## Backlog
@@ -45,6 +46,9 @@
   * Collections
     * [ ] Min lengths
     * [ ] Max
+  * Recursion
+    * Helpers to limit recursion depth
+    * Or just weighted one-of?
 * [ ] Examples ("inspired" by hedgehog/hypothesis/etc)
   * [ ] http://matt.might.net/articles/quick-quickcheck/
   * [ ] https://github.com/BurntSushi/quickcheck
