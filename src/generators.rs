@@ -42,6 +42,7 @@ pub struct CollectionGenerator<C, G> {
 
 /// See [`one_of`](fn.one_of.html)
 pub struct OneOfGenerator<GS>(GS);
+/// See [`lazy`](fn.lazy.html)
 pub struct LazyGenerator<F>(F);
 
 /// Internal implementation for [`one_of`](fn.one_of.html). Defines the
@@ -240,6 +241,8 @@ where
     }
 }
 
+/// Returns a lazily evaluated generator. The `thunk` should be pure.
+/// Mostly used to allow recursive generators.
 pub fn lazy<F: Fn() -> G, G:Generator>(thunk: F) -> LazyGenerator<F> {
     LazyGenerator(thunk)
 }
