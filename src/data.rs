@@ -123,52 +123,98 @@ impl<'a> Iterator for InfoReplay<'a> {
     }
 }
 
-fn minimize_via_removal<F: Fn(InfoReplay) -> bool>(
-    p: &InfoPool,
-    candidate: &mut InfoPool,
-    pred: &F,
-) -> Option<InfoPool> {
-    // First shrink tactic: item removal
-    trace!("minimizing by removal: {:?}", p);
-    if p.data.len() == 0 {
-        return None;
-    }
+/// Iterates over a series of shrunk pools. If we imagine that our buffer has
+/// a sz of (1 << (log2sz-1)) < sz ≤ (1 << log2sz), then where:
+/// f(x) = 1<<(log2sz-x) we want to cut out
+/// chunks of:
+/// ```
+/// 0..f(0),
+/// 0..f(1), f(1)..2f(1),
+/// 0..f(2), f(2)..2f(2), 2f(2)..3f(2), 3f(2)..4f(2),
+/// ```
+///
+/// In other words, we remove the whole lot, then first half, second half,
+/// first quarter, second quarter, etc.
+#[derive(Debug)]
+struct RemovalShrinker {
+    seed: InfoPool,
+    log2sz: usize,
+    level: usize,
+    chunk: usize,
+}
 
-    let max_pow = 0usize.count_zeros();
-    let pow = max_pow - p.data.len().leading_zeros();
-    for granularity in 0..pow {
-        let width = 1 << (pow - granularity);
-        for chunk in 0..(1 << granularity) {
-            let start = min(chunk * width, p.data.len());
-            let end = min(start + width, p.data.len());
-            if start == end {
-                break;
-            }
-
-            candidate.data.clear();
-            candidate.data.extend(&p.data[0..start]);
-            candidate.data.extend(&p.data[end..]);
-
-            let test = pred(candidate.replay());
-            trace!(
-                "removed {},{}: {:?}; test result {}",
-                start,
-                end,
-                candidate,
-                test
-            );
-            if test {
-                if let Some(res) = minimize(&candidate, pred) {
-                    trace!("Returning shrunk: {:?}", res);
-                    return Some(res);
-                } else {
-                    trace!("Returning original: {:?}", candidate);
-                    return Some(candidate.clone());
-                }
-            }
+impl RemovalShrinker {
+    fn new(seed: InfoPool) -> Self {
+        let max_pow = 0usize.count_zeros();
+        let pow = max_pow - seed.data.len().leading_zeros();
+        RemovalShrinker {
+            seed,
+            log2sz: pow as usize,
+            // Ranges from 0..self.log2sz
+            level: 0,
+            // Ranges from 0..(1<<self.level)
+            chunk: 0,
         }
     }
-    None
+}
+
+impl Iterator for RemovalShrinker {
+    type Item = InfoPool;
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            trace!("RemovalShrinker#next: {:?}", self);
+            if self.level > self.log2sz {
+                return None;
+            }
+
+            let granularity = self.log2sz - self.level;
+            let width = 1 << granularity;
+            let chunk = self.chunk;
+
+            let start = chunk * width;
+            let end = start + width;
+
+            if start >= self.seed.data.len() {
+                trace!(
+                    "Out of slice ({},{}) >= {}",
+                    start,
+                    end,
+                    self.seed.data.len()
+                );
+                self.chunk = 0;
+                self.level += 1;
+                continue;
+            } else {
+                self.chunk += 1;
+            }
+            let start = min(start, self.seed.data.len());
+            let end = min(end, self.seed.data.len());
+
+            let mut candidate = InfoPool::new();
+            candidate.data.clear();
+            candidate.data.extend(&self.seed.data[0..start]);
+            candidate.data.extend(&self.seed.data[end..]);
+            trace!("removed {},{} -> {:?}", start, end, candidate);
+
+
+            return Some(candidate);
+        }
+    }
+}
+
+fn minimize_via_removal<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
+    let res = RemovalShrinker::new(p.clone())
+        .filter(|c| {
+            let test = pred(c.replay());
+            trace!("test result: {:?} <= {:?}", test, c);
+            test
+        })
+        .next();
+
+    return res.map(|candidate| {
+        trace!("Re-Shrinking: {:?}", candidate);
+        return minimize(&candidate, pred).unwrap_or(candidate);
+    });
 }
 
 fn minimize_via_scalar_shrink<F: Fn(InfoReplay) -> bool>(
@@ -237,11 +283,11 @@ fn minimize_via_scalar_shrink<F: Fn(InfoReplay) -> bool>(
 /// pool, and then tries reducing it to zero, then half, thn three quarters,
 /// seven eighths, and so on.
 pub fn minimize<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
-    let mut candidate = p.clone();
-    if let Some(res) = minimize_via_removal(p, &mut candidate, pred) {
+    if let Some(res) = minimize_via_removal(p, pred) {
         return Some(res);
     }
 
+    let mut candidate = p.clone();
     if let Some(res) = minimize_via_scalar_shrink(p, &mut candidate, pred) {
         return Some(res);
     }
