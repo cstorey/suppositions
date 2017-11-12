@@ -218,49 +218,77 @@ fn minimize_via_removal<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Op
     });
 }
 
-fn minimize_via_scalar_shrink<F: Fn(InfoReplay) -> bool>(
-    p: &InfoPool,
-    candidate: &mut InfoPool,
-    pred: &F,
-) -> Option<InfoPool> {
-    // Second shrink tactic: make values smaller
-    trace!("minimizing by scalar shrink: {:?}", p);
-    for i in 0..p.data.len() {
-        candidate.clone_from(&p);
+#[derive(Debug)]
+struct ScalarShrinker {
+    seed: InfoPool,
+    pos: usize,
+    bitoff: u32,
+}
 
-        let max_pow = 0u8.count_zeros();
-        let pow = max_pow - p.data[i].leading_zeros();
-        for bitoff in 0..pow {
-            candidate.data[i] = p.data[i] - (p.data[i] >> bitoff);
-            trace!(
-                "shrunk item -(bitoff:{}) {} {}->{}: {:?}",
-                bitoff,
-                i,
-                p.data[i],
-                candidate.data[i],
-                candidate
-            );
-
-            if candidate.buffer() == p.buffer() {
-                trace!("No change");
-                continue;
-            }
-
-            let test = pred(candidate.replay());
-            trace!("test result {}", test);
-            if test {
-                if let Some(res) = minimize(&candidate, pred) {
-                    trace!("Returning shrunk: {:?}", res);
-                    return Some(res);
-                } else {
-                    trace!("Returning original: {:?}", candidate);
-                    return Some(candidate.clone());
-                }
-            }
+impl ScalarShrinker {
+    fn new(pool: InfoPool) -> Self {
+        ScalarShrinker {
+            seed: pool,
+            pos: 0,
+            bitoff: 0,
         }
     }
+}
+impl Iterator for ScalarShrinker {
+    type Item = InfoPool;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut candidate = self.seed.clone();
+        while self.pos < self.seed.data.len() {
+            trace!("ScalarShrinker#next: {:?}", self);
+            let pos = self.pos;
+            let bitoff = self.bitoff;
 
-    None
+            let orig_val = candidate.data[pos];
+            let new_val = orig_val - (orig_val.overflowing_shr(bitoff).0);
+
+            let log2val = (0u8.leading_zeros()) - orig_val.leading_zeros();
+            if self.bitoff >= log2val {
+                self.pos += 1;
+                self.bitoff = 0;
+                continue;
+            } else {
+                self.bitoff += 1;
+            }
+
+            if orig_val != new_val {
+                candidate.data[pos] = new_val;
+                trace!(
+                    "shrunk item -(bitoff:{}) {} {}->{}: {:?}",
+                    bitoff,
+                    pos,
+                    orig_val,
+                    new_val,
+                    candidate
+                );
+
+                return Some(candidate);
+            }
+        }
+        return None;
+    }
+}
+
+fn minimize_via_scalar_shrink<F: Fn(InfoReplay) -> bool>(
+    p: &InfoPool,
+    pred: &F,
+) -> Option<InfoPool> {
+    let res = ScalarShrinker::new(p.clone())
+        .filter(|c| {
+            let test = pred(c.replay());
+            trace!("test result: {:?} <= {:?}", test, c);
+            test
+        })
+        .next();
+
+    return res.map(|candidate| {
+        trace!("Re-Shrinking: {:?}", candidate);
+        return minimize(&candidate, pred).unwrap_or(candidate);
+    });
 }
 
 /// Try to find the smallest pool `p` such that the predicate `pred` returns
@@ -288,8 +316,7 @@ pub fn minimize<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Option<Inf
         return Some(res);
     }
 
-    let mut candidate = p.clone();
-    if let Some(res) = minimize_via_scalar_shrink(p, &mut candidate, pred) {
+    if let Some(res) = minimize_via_scalar_shrink(p, pred) {
         return Some(res);
     }
 
@@ -429,13 +456,36 @@ mod tests {
     }
 
     #[test]
-    fn shrink_by_removal_should_produce_somewhat_outputs() {
+    fn shrink_by_removal_should_produce_somewhat_unique_outputs() {
         env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec((0..256usize).map(|v| v as u8).collect::<Vec<_>>());
         let mut counts = BTreeMap::new();
         for val in RemovalShrinker::new(p) {
             debug!("{:?}", val);
             *counts.entry(val).or_insert(0) += 1;
+        }
+
+        assert!(
+            counts.values().all(|&val| val == 1),
+            "Expect all items to be unique; non-unique entries {:?}",
+            counts
+                .iter()
+                .filter(|&(_, &v)| v != 1)
+                .collect::<BTreeMap<_, _>>()
+        )
+    }
+
+    #[test]
+    fn shrink_by_scalar_should_produce_somewhat_unique_outputs() {
+        env_logger::init().unwrap_or(());
+        let p = InfoPool::of_vec((0..256usize).map(|v| v as u8).collect::<Vec<_>>());
+        let mut counts = BTreeMap::new();
+        for val in ScalarShrinker::new(p) {
+            let mut ent = counts.entry(val.clone()).or_insert(0);
+            *ent += 1;
+            if *ent > 1 {
+                debug!("Dup! {}: {:?}", *ent, val);
+            }
         }
 
         assert!(
