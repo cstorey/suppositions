@@ -33,7 +33,7 @@ impl Expr {
     }
 }
 
-fn expr_gen() -> Box<GeneratorObject<Item=Expr>> {
+fn expr_gen() -> Box<GeneratorObject<Item = Expr>> {
     let lit = u8s().map(Expr::Lit);
     let lit2 = u8s().map(Expr::Lit);
     let add = (lazy(expr_gen), lazy(expr_gen)).map(|(a, b)| Expr::Add(Box::new(a), Box::new(b)));
@@ -45,10 +45,9 @@ fn expr_gen() -> Box<GeneratorObject<Item=Expr>> {
 #[test]
 fn add_adds() {
     env_logger::init().expect("env_logger::init");
-    property((expr_gen(), expr_gen()))
-        .check(|(a, b)| {
-            debug!("Testing: {:?} + {:?}", a,b);
-            assert_eq!(a.eval() + b.eval(), (a + b).eval())
-        });
+    property((expr_gen(), expr_gen())).check(|(a, b)| {
+        debug!("Testing: {:?} + {:?}", a, b);
+        assert_eq!(a.eval() + b.eval(), (a + b).eval())
+    });
 
 }
