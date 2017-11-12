@@ -203,20 +203,6 @@ impl Iterator for RemovalShrinker {
     }
 }
 
-fn minimize_via_removal<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
-    let res = RemovalShrinker::new(p.clone())
-        .filter(|c| {
-            let test = pred(c.replay());
-            trace!("test result: {:?} <= {:?}", test, c);
-            test
-        })
-        .next();
-
-    return res.map(|candidate| {
-        trace!("Re-Shrinking: {:?}", candidate);
-        return minimize(&candidate, pred).unwrap_or(candidate);
-    });
-}
 
 #[derive(Debug)]
 struct ScalarShrinker {
@@ -273,24 +259,6 @@ impl Iterator for ScalarShrinker {
     }
 }
 
-fn minimize_via_scalar_shrink<F: Fn(InfoReplay) -> bool>(
-    p: &InfoPool,
-    pred: &F,
-) -> Option<InfoPool> {
-    let res = ScalarShrinker::new(p.clone())
-        .filter(|c| {
-            let test = pred(c.replay());
-            trace!("test result: {:?} <= {:?}", test, c);
-            test
-        })
-        .next();
-
-    return res.map(|candidate| {
-        trace!("Re-Shrinking: {:?}", candidate);
-        return minimize(&candidate, pred).unwrap_or(candidate);
-    });
-}
-
 /// Try to find the smallest pool `p` such that the predicate `pred` returns
 /// true. Given that our [generators](../generators/index.html) tend to
 /// generate smaller outputs from smaller inputs, by minimizing the source
@@ -312,16 +280,20 @@ fn minimize_via_scalar_shrink<F: Fn(InfoReplay) -> bool>(
 /// pool, and then tries reducing it to zero, then half, thn three quarters,
 /// seven eighths, and so on.
 pub fn minimize<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
-    if let Some(res) = minimize_via_removal(p, pred) {
-        return Some(res);
-    }
+    let shrunk_pools = RemovalShrinker::new(p.clone()).chain(ScalarShrinker::new(p.clone()));
+    let mut matching_shrinks = shrunk_pools.filter(|c| {
+        let test = pred(c.replay());
+        trace!("test result: {:?} <= {:?}", test, c);
+        test
+    });
 
-    if let Some(res) = minimize_via_scalar_shrink(p, pred) {
-        return Some(res);
+    if let Some(candidate) = matching_shrinks.next() {
+        trace!("Re-Shrinking: {:?}", candidate);
+        Some(minimize(&candidate, pred).unwrap_or(candidate))
+    } else {
+        trace!("Nothing smaller found than {:?}", p);
+        None
     }
-
-    trace!("Nothing smaller found than {:?}", p);
-    None
 }
 
 #[cfg(test)]
