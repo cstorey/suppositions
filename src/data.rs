@@ -11,7 +11,7 @@ use rand::{random, Rng, XorShiftRng};
 use std::cmp::min;
 
 /// A pool of data that we can draw upon to generate other types of data.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InfoPool {
     data: Vec<u8>,
 }
@@ -145,8 +145,9 @@ struct RemovalShrinker {
 
 impl RemovalShrinker {
     fn new(seed: InfoPool) -> Self {
+        let max_idx = seed.data.len().saturating_sub(1);
         let max_pow = 0usize.count_zeros();
-        let pow = max_pow - seed.data.len().leading_zeros();
+        let pow = max_pow - max_idx.leading_zeros();
         RemovalShrinker {
             seed,
             log2sz: pow as usize,
@@ -300,6 +301,7 @@ pub fn minimize<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Option<Inf
 mod tests {
     extern crate env_logger;
     use super::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn should_take_each_item_in_pool() {
@@ -424,5 +426,25 @@ mod tests {
         let min = minimize(&p, &|t| t.take(16).any(|v| v >= 251)).expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[251])
+    }
+
+    #[test]
+    fn shrink_by_removal_should_produce_somewhat_outputs() {
+        env_logger::init().unwrap_or(());
+        let p = InfoPool::of_vec((0..256usize).map(|v| v as u8).collect::<Vec<_>>());
+        let mut counts = BTreeMap::new();
+        for val in RemovalShrinker::new(p) {
+            debug!("{:?}", val);
+            *counts.entry(val).or_insert(0) += 1;
+        }
+
+        assert!(
+            counts.values().all(|&val| val == 1),
+            "Expect all items to be unique; non-unique entries {:?}",
+            counts
+                .iter()
+                .filter(|&(_, &v)| v != 1)
+                .collect::<BTreeMap<_, _>>()
+        )
     }
 }
