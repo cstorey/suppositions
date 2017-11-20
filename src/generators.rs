@@ -261,7 +261,7 @@ where
 
 /// Returns a lazily evaluated generator. The `thunk` should be pure.
 /// Mostly used to allow recursive generators.
-pub fn lazy<F: Fn() -> G, G:Generator>(thunk: F) -> LazyGenerator<F> {
+pub fn lazy<F: Fn() -> G, G: Generator>(thunk: F) -> LazyGenerator<F> {
     LazyGenerator(thunk)
 }
 
@@ -642,7 +642,7 @@ impl<GS: OneOfItem> OneOfGenerator<GS> {
     }
 }
 
-impl <F: Fn() -> G, G: Generator> Generator for LazyGenerator<F> {
+impl<F: Fn() -> G, G: Generator> Generator for LazyGenerator<F> {
     type Item = G::Item;
     fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
         let g = self.0();
