@@ -112,6 +112,13 @@ pub trait Generator {
     }
 }
 
+impl<G: Generator> InfoSink for G {
+    type Out = Maybe<G::Item>;
+    fn sink<I: InfoSource>(&mut self, src: &mut I) -> Self::Out {
+        self.generate(src)
+    }
+}
+
 /// Like [`Generator`](trait.Generator.html), but allows use as a trait object.
 pub trait GeneratorObject {
     /// The type of values that we can generate.
@@ -196,12 +203,11 @@ impl Generator for BoolGenerator {
     }
 }
 
-
 impl<G: Generator> Generator for OptionalGenerator<G> {
     type Item = Option<G::Item>;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let bs = booleans();
-        let result = if bs.generate(src)? {
+        let result = if src.draw(bs)? {
             Some(self.0.generate(src)?)
         } else {
             None

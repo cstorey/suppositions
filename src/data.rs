@@ -10,23 +10,31 @@ use hex_slice::AsHex;
 use rand::{random, Rng, XorShiftRng};
 use std::cmp::min;
 
+pub trait InfoSink {
+    type Out;
+    fn sink<I: InfoSource>(&mut self, i: &mut I) -> Self::Out;
+}
+
 /// Something that an act as a source of test data.
 pub trait InfoSource {
     /// Take a single byte from the source.
     fn draw_u8(&mut self) -> u8;
 
     /// Call F with access to the data source.
-    fn draw<F: Fn(&mut Self) -> R, R>(&mut self, f: F) -> R
+    fn draw<S: InfoSink>(&mut self, sink: S) -> S::Out
     where
-        Self: Sized,
-    {
-        f(self)
-    }
+        Self: Sized;
 }
 
 impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
     fn draw_u8(&mut self) -> u8 {
         (**self).draw_u8()
+    }
+    fn draw<S: InfoSink>(&mut self, mut sink: S) -> S::Out
+    where
+        Self: Sized,
+    {
+        sink.sink(self)
     }
 }
 
@@ -122,6 +130,13 @@ impl<'a> InfoSource for InfoTap<'a> {
     fn draw_u8(&mut self) -> u8 {
         self.next_byte()
     }
+
+    fn draw<S: InfoSink>(&mut self, mut sink: S) -> S::Out
+    where
+        Self: Sized,
+    {
+        sink.sink(self)
+    }
 }
 
 impl<'a> InfoReplay<'a> {
@@ -138,6 +153,13 @@ impl<'a> InfoReplay<'a> {
 impl<'a> InfoSource for InfoReplay<'a> {
     fn draw_u8(&mut self) -> u8 {
         self.next_byte()
+    }
+
+    fn draw<S: InfoSink>(&mut self, mut sink: S) -> S::Out
+    where
+        Self: Sized,
+    {
+        sink.sink(self)
     }
 }
 
