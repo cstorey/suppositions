@@ -4,6 +4,7 @@ extern crate env_logger;
 
 use suppositions::*;
 use suppositions::generators::*;
+use suppositions::data::*;
 
 fn _assert_is_generator<G: Generator>(_: &G) {}
 
@@ -186,4 +187,56 @@ fn lazy_generator_yields_same_as_inner_value() {
         let v1 = lazy.generate_from(&p)?;
         Ok((v0, v1))
     })).check(|(v0, v1)| v0 == v1)
+}
+
+struct RegionCounter<S> {
+    src: S,
+    cnt: usize,
+}
+
+impl<G: InfoSource> InfoSource for RegionCounter<G> {
+    fn draw_u8(&mut self) -> u8 {
+        self.src.draw_u8()
+    }
+    fn draw<S: InfoSink>(&mut self, sink: S) -> S::Out
+    where
+        Self: Sized,
+    {
+        self.cnt += 1;
+        self.src.draw(sink)
+    }
+}
+
+#[test]
+fn optional_u64s_should_have_one_region_for_none() {
+    let g = optional(u64s());
+
+    property(
+        info_pools(32)
+            .filter_map(|p| {
+                let mut ctr = RegionCounter {
+                    src: &mut p.replay(),
+                    cnt: 0,
+                };
+                g.generate(&mut ctr).map(|val| (ctr.cnt, val))
+            })
+            .filter(|&(_, ref val)| val.is_none()),
+    ).check(|(cnt, _)| assert_eq!(1, cnt));
+}
+
+#[test]
+fn optional_u64s_should_have_two_regions_for_some() {
+    let g = optional(u64s());
+
+    property(
+        info_pools(32)
+            .filter_map(|p| {
+                let mut ctr = RegionCounter {
+                    src: &mut p.replay(),
+                    cnt: 0,
+                };
+                g.generate(&mut ctr).map(|val| (ctr.cnt, val))
+            })
+            .filter(|&(_, ref val)| val.is_some()),
+    ).check(|(cnt, _)| assert_eq!(2, cnt));
 }

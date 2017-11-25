@@ -112,7 +112,7 @@ pub trait Generator {
     }
 }
 
-impl<G: Generator> InfoSink for G {
+impl<'a, G: Generator> InfoSink for &'a G {
     type Out = Maybe<G::Item>;
     fn sink<I: InfoSource>(&mut self, src: &mut I) -> Self::Out {
         self.generate(src)
@@ -207,8 +207,8 @@ impl<G: Generator> Generator for OptionalGenerator<G> {
     type Item = Option<G::Item>;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let bs = booleans();
-        let result = if src.draw(bs)? {
-            Some(self.0.generate(src)?)
+        let result = if src.draw(&bs)? {
+            Some(src.draw(&self.0)?)
         } else {
             None
         };
@@ -547,11 +547,11 @@ pub mod tests {
         should_partially_order_same_as_source(booleans())
     }
 
-
     #[test]
     fn optional_u64s_minimize_to_none() {
         should_minimize_to(optional(u64s()), None);
     }
+
 
     #[test]
     fn result_u8_u64s_minimize_to_ok() {
