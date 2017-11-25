@@ -43,6 +43,8 @@ extern crate rand;
 extern crate hex_slice;
 #[macro_use]
 extern crate log;
+#[cfg(test)]
+extern crate env_logger;
 
 pub mod data;
 pub mod generators;
