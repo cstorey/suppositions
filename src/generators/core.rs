@@ -1,10 +1,6 @@
-//! This module describes how data gets generated from the underlying representation
-//! in the [`suppositions::data`](../data/index.html) module.
-use std::marker::PhantomData;
-use std::mem::size_of;
-use std::iter;
-
 use data::*;
+
+use super::numbers::{u32s, uniform_f32s};
 
 /// A convenience alias for generators that use the pool.
 pub type Maybe<T> = Result<T, DataError>;
@@ -12,27 +8,6 @@ pub type Maybe<T> = Result<T, DataError>;
 /// See [`booleans`](fn.booleans.html).
 #[derive(Debug, Clone)]
 pub struct BoolGenerator;
-/// See [`u64s`](fn.u64s.html), [`i64s`](fn.i64s.html), etc.
-#[derive(Debug, Clone)]
-pub struct IntGenerator<N>(PhantomData<N>);
-/// See [`f32s`](fn.f32s.html)
-/// or [`f64s`](fn.f64s.html)
-#[derive(Debug, Clone)]
-pub struct FloatGenerator<N>(PhantomData<N>);
-/// See [`uniform_f32s`](fn.uniform_f32s.html)
-/// or [`uniform_f64s`](fn.uniform_f64s.html)
-#[derive(Debug, Clone)]
-pub struct UniformFloatGenerator<N>(PhantomData<N>);
-/// See [`vecs`](fn.vecs.html)
-#[derive(Debug, Clone)]
-pub struct VecGenerator<G> {
-    inner: G,
-    mean_length: usize,
-}
-
-/// See [`info_pools`](fn.info_pools.html)
-#[derive(Debug, Clone)]
-pub struct InfoPoolGenerator(usize);
 /// See [`weighted_coin`](fn.weighted_coin.html)
 #[derive(Debug, Clone)]
 pub struct WeightedCoinGenerator(f32);
@@ -42,13 +17,6 @@ pub struct OptionalGenerator<G>(G);
 /// See [`result`](fn.result.html)
 #[derive(Debug, Clone)]
 pub struct ResultGenerator<G, H>(G, H);
-/// See [`collections`](fn.collections.html)
-#[derive(Debug, Clone)]
-pub struct CollectionGenerator<C, G> {
-    witness: PhantomData<C>,
-    inner: G,
-    mean_length: usize,
-}
 
 /// See [`one_of`](fn.one_of.html)
 #[derive(Debug, Clone)]
@@ -197,31 +165,12 @@ pub fn booleans() -> BoolGenerator {
 }
 
 
-/// Generates vectors with items given by `inner`.
-pub fn vecs<G>(inner: G) -> VecGenerator<G> {
-    VecGenerator {
-        inner: inner,
-        mean_length: 10,
-    }
-}
-
-impl<G> VecGenerator<G> {
-    /// Specify the mean length of the vector.
-    pub fn mean_length(mut self, mean: usize) -> Self {
-        self.mean_length = mean;
-        self
-    }
-}
 
 /// Always generates a clone of the given value.
 pub fn consts<V: Clone>(val: V) -> Const<V> {
     Const(val)
 }
 
-/// Randomly generates an info-pool (mostly used for testing generators).
-pub fn info_pools(len: usize) -> InfoPoolGenerator {
-    InfoPoolGenerator(len)
-}
 /// Generates a boolean with the specified probability (0.0 <= p <= 1.0) of being true.
 pub fn weighted_coin(p: f32) -> WeightedCoinGenerator {
     WeightedCoinGenerator(p)
@@ -238,26 +187,6 @@ pub fn result<G: Generator, H: Generator>(ok: G, err: H) -> ResultGenerator<G, H
     ResultGenerator(ok, err)
 }
 
-/// Generates a collection of the given type, populated with elements from the
-/// item generator.
-///
-/// To generate values of BTreeSet<u8>:
-///
-/// ```
-/// use std::collections::BTreeSet;
-/// use suppositions::generators::*;
-/// let gen = collections::<BTreeSet<_>, _>(u8s());
-/// ```
-pub fn collections<C, G: Generator>(item: G) -> CollectionGenerator<C, G>
-where
-    C: Extend<G::Item>,
-{
-    CollectionGenerator {
-        witness: PhantomData,
-        inner: item,
-        mean_length: 16,
-    }
-}
 
 /// Returns a lazily evaluated generator. The `thunk` should be pure.
 /// Mostly used to allow recursive generators.
@@ -265,34 +194,6 @@ pub fn lazy<F: Fn() -> G, G: Generator>(thunk: F) -> LazyGenerator<F> {
     LazyGenerator(thunk)
 }
 
-impl<G: Generator> Generator for VecGenerator<G> {
-    type Item = Vec<G::Item>;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        let mut result = Vec::new();
-        let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
-        let bs = weighted_coin(1.0 - p_is_final);
-        while bs.generate(src)? {
-            let item = self.inner.generate(src)?;
-            result.push(item)
-        }
-
-        Ok(result)
-    }
-}
-
-impl Generator for InfoPoolGenerator {
-    type Item = InfoPool;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        let mut result = Vec::new();
-        let vals = u8s();
-        for _ in 0..self.0 {
-            let item = vals.generate(src)?;
-            result.push(item)
-        }
-
-        Ok(InfoPool::of_vec(result))
-    }
-}
 
 impl Generator for BoolGenerator {
     type Item = bool;
@@ -303,129 +204,6 @@ impl Generator for BoolGenerator {
     }
 }
 
-macro_rules! unsigned_integer_gen {
-    ($name:ident, $ty:ty) => {
-        /// A generator that generates integers of the specified type.
-        pub fn $name() -> IntGenerator<$ty> {
-            IntGenerator(PhantomData)
-        }
-
-        impl Generator for IntGenerator<$ty> {
-            type Item = $ty;
-            fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-                assert!(size_of::<u8>() == 1);
-                let nbytes = size_of::<$ty>() / size_of::<u8>();
-                let mut val: $ty = 0;
-                for _ in 0..nbytes {
-                    val = val.wrapping_shl(8) | src.next().ok_or(DataError::PoolExhausted)?
- as $ty;
-                }
-                Ok(val)
-            }
-        }
-    }
-}
-
-unsigned_integer_gen!(u8s, u8);
-unsigned_integer_gen!(u16s, u16);
-unsigned_integer_gen!(u32s, u32);
-unsigned_integer_gen!(u64s, u64);
-unsigned_integer_gen!(usizes, usize);
-
-// We use the equivalent unsigned generator as an intermediate
-macro_rules! signed_integer_gen {
-    ($name:ident, $ugen:expr, $ty:ty) => {
-        /// A generator that generates the full range of the specified type.
-        pub fn $name() -> IntGenerator<$ty> {
-            IntGenerator(PhantomData)
-        }
-
-        impl Generator for IntGenerator<$ty> {
-            type Item = $ty;
-            fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-                let inner_g = $ugen;
-                let uval = inner_g.generate(src)?;
-                let is_neg = (uval & 1) == 0;
-                let uval = uval >> 1;
-                if is_neg {
-                    Ok(-(uval as $ty))
-                } else {
-                    Ok(uval as $ty)
-                }
-            }
-        }
-    }
-}
-
-signed_integer_gen!(i8s, u8s(), i8);
-signed_integer_gen!(i16s, u16s(), i16);
-signed_integer_gen!(i32s, u32s(), i32);
-signed_integer_gen!(i64s, u64s(), i64);
-signed_integer_gen!(isizes, usizes(), isize);
-
-
-// As with signed types, use the equivalent unsigned generator as an intermediate
-macro_rules! float_gen {
-    ($name:ident, $ugen:expr, $ty:ident) => {
-            /// Generates values that encompass all possible float values
-            /// (positive and negative), including NaN, and sub-normal values.
-        pub fn $name() -> FloatGenerator<$ty> {
-            FloatGenerator(PhantomData)
-        }
-
-        impl Generator for FloatGenerator<$ty> {
-            type Item = $ty;
-            fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-                let inner_g = $ugen;
-                let uval = inner_g.generate(src)?;
-
-                let is_neg = (uval & 1) == 0;
-                let fval = $ty::from_bits(uval >> 1);
-                if is_neg {
-                    Ok(-(fval as $ty))
-                } else {
-                    Ok(fval as $ty)
-                }
-            }
-        }
-    }
-}
-
-float_gen!(f32s, u32s(), f32);
-float_gen!(f64s, u64s(), f64);
-
-// As with signed types, use the equivalent unsigned generator as an intermediate
-macro_rules! uniform_float_gen {
-    ($name:ident, $ugen:expr, $inty:ident, $ty:ident) => {
-        /// Generates values that are uniformly distributed, such that the
-        /// output value x satisifes 0.0 <= x < 1.0
-        pub fn $name() -> UniformFloatGenerator<$ty> {
-            UniformFloatGenerator(PhantomData)
-        }
-
-        impl Generator for UniformFloatGenerator<$ty> {
-            type Item = $ty;
-            fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-                let inner_g = $ugen;
-                let uval = inner_g.generate(src)?;
-                return Ok(uval as $ty / $inty::max_value() as $ty);
-            }
-        }
-    }
-}
-
-uniform_float_gen!(uniform_f32s, u32s(), u32, f32);
-uniform_float_gen!(uniform_f64s, u64s(), u64, f64);
-
-impl Generator for WeightedCoinGenerator {
-    type Item = bool;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        let &WeightedCoinGenerator(p) = self;
-        let v = uniform_f32s().generate(src)?;
-        let res = v > (1.0 - p);
-        Ok(res)
-    }
-}
 
 impl<G: Generator> Generator for OptionalGenerator<G> {
     type Item = Option<G::Item>;
@@ -453,29 +231,6 @@ impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
         };
 
         Ok(result)
-    }
-}
-impl<G, C> CollectionGenerator<C, G> {
-    /// Specify the mean number of _generated_ items. For collections with
-    /// set semantics, this many not be the same as the mean size of the
-    /// collection.
-    pub fn mean_length(mut self, mean: usize) -> Self {
-        self.mean_length = mean;
-        self
-    }
-}
-impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerator<C, G> {
-    type Item = C;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        let mut coll: C = Default::default();
-        let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
-        let bs = weighted_coin(1.0 - p_is_final);
-        while bs.generate(src)? {
-            let item = self.inner.generate(src)?;
-            coll.extend(iter::once(item));
-        }
-
-        Ok(coll)
     }
 }
 
@@ -519,98 +274,15 @@ impl<V: Clone> Generator for Const<V> {
     }
 }
 
-macro_rules! tuple_generator_impl {
-    ($gen_a:ident: $var_a:ident: $type_a:ident $(, $gen_n: ident: $var_n:ident: $type_n:ident)*) => (
-        impl<$type_a: Generator, $($type_n: Generator),*> Generator
-                for ($type_a, $($type_n),*) {
-                    type Item = ($type_a::Item, $($type_n::Item),*);
-                    fn generate<In: Iterator<Item = u8>>(&self, src: &mut In) -> Maybe<Self::Item> {
-                        // Gens
-                        let &(ref $gen_a, $(ref $gen_n),*) = self;
-                        let $var_a = $gen_a.generate(src)?;
-                        $(let $var_n = $gen_n.generate(src)?;)*
-                        Ok(($var_a, $($var_n),*))
-                    }
-                }
-    );
+impl Generator for WeightedCoinGenerator {
+    type Item = bool;
+    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+        let &WeightedCoinGenerator(p) = self;
+        let v = uniform_f32s().generate(src)?;
+        let res = v > (1.0 - p);
+        Ok(res)
+    }
 }
-
-tuple_generator_impl!(ga: a: A, gb: b: B);
-tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C);
-tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C, gd: d: D);
-
-tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C, gd: d: D, ge: e: E);
-tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C, gd: d: D, ge: e: E, gf: f: F);
-tuple_generator_impl!(
-    ga: a: A,
-    gb: b: B,
-    gc: c: C,
-    gd: d: D,
-    ge: e: E,
-    gf: f: F,
-    gg: g: G
-);
-tuple_generator_impl!(
-    ga: a: A,
-    gb: b: B,
-    gc: c: C,
-    gd: d: D,
-    ge: e: E,
-    gf: f: F,
-    gg: g: G,
-    gh: h: H
-);
-
-tuple_generator_impl!(
-    ga: a: A,
-    gb: b: B,
-    gc: c: C,
-    gd: d: D,
-    ge: e: E,
-    gf: f: F,
-    gg: g: G,
-    gh: h: H,
-    gi: i: I
-);
-tuple_generator_impl!(
-    ga: a: A,
-    gb: b: B,
-    gc: c: C,
-    gd: d: D,
-    ge: e: E,
-    gf: f: F,
-    gg: g: G,
-    gh: h: H,
-    gi: i: I,
-    gj: j: J
-);
-tuple_generator_impl!(
-    ga: a: A,
-    gb: b: B,
-    gc: c: C,
-    gd: d: D,
-    ge: e: E,
-    gf: f: F,
-    gg: g: G,
-    gh: h: H,
-    gi: i: I,
-    gj: j: J,
-    gk: k: K
-);
-tuple_generator_impl!(
-    ga: a: A,
-    gb: b: B,
-    gc: c: C,
-    gd: d: D,
-    ge: e: E,
-    gf: f: F,
-    gg: g: G,
-    gh: h: H,
-    gi: i: I,
-    gj: j: J,
-    gk: k: K,
-    gl: l: L
-);
 
 /// Allows the user to use one of a set of alternative generators.
 /// Often useful when you need to generate elements of an enum.
@@ -707,14 +379,16 @@ pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(
 }
 
 #[cfg(test)]
-mod tests {
-    extern crate env_logger;
+pub mod tests {
     use rand::{random, Rng};
+    use env_logger;
     use std::iter;
     use std::fmt;
     use std::collections::BTreeMap;
     use super::*;
     use data::InfoPool;
+    use generators::numbers::*;
+
     const SHORT_VEC_SIZE: usize = 256;
 
     fn gen_random_vec() -> Vec<u8> {
@@ -723,13 +397,13 @@ mod tests {
 
     /// Create an `InfoPool` with a `size` length vector of random bytes
     /// using the generator `rng`. (Mostly used for testing).
-    fn unseeded_of_size(size: usize) -> InfoPool {
+    pub fn unseeded_of_size(size: usize) -> InfoPool {
         let mut rng = ::rand::XorShiftRng::new_unseeded();
         InfoPool::of_vec((0..size).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>())
     }
 
 
-    fn should_generate_same_output_given_same_input<G: Generator>(gen: G)
+    pub fn should_generate_same_output_given_same_input<G: Generator>(gen: G)
     where
         G::Item: fmt::Debug + PartialEq,
     {
@@ -747,7 +421,7 @@ mod tests {
         }
     }
 
-    fn usually_generates_different_output_for_different_inputs<G: Generator>(gen: G)
+    pub fn usually_generates_different_output_for_different_inputs<G: Generator>(gen: G)
     where
         G::Item: PartialEq,
     {
@@ -772,14 +446,18 @@ mod tests {
     // `while booleans() { elemnt() }`
     // So because booleans are imprecisly generated (ie: a pool of [0xff] ~ [0x80]),
     // the source and result can have a differing ordering.
-    fn should_partially_order_same_as_source<G: Generator>(gen: G)
+    pub fn should_partially_order_same_as_source<G: Generator>(gen: G)
     where
         G::Item: PartialOrd + fmt::Debug + Clone,
     {
         should_partially_order_same_as_source_by(gen, |v| v.clone())
     }
 
-    fn should_partially_order_same_as_source_by<G: Generator, K: PartialOrd, F: Fn(&G::Item) -> K>(
+    pub fn should_partially_order_same_as_source_by<
+        G: Generator,
+        K: PartialOrd,
+        F: Fn(&G::Item) -> K,
+    >(
         gen: G,
         key: F,
     ) where
@@ -836,7 +514,7 @@ mod tests {
         assert_eq!(bools.generate(&mut InfoPool::of_vec(v1).replay()), Ok(true));
     }
 
-    fn should_minimize_to<G: Generator>(gen: G, expected: G::Item)
+    pub fn should_minimize_to<G: Generator>(gen: G, expected: G::Item)
     where
         G::Item: fmt::Debug + PartialEq,
     {
@@ -857,6 +535,7 @@ mod tests {
         assert_eq!(val, expected);
 
     }
+
     #[test]
     fn bools_should_generate_same_output_given_same_input() {
         should_generate_same_output_given_same_input(booleans())
@@ -878,131 +557,6 @@ mod tests {
         should_partially_order_same_as_source(booleans())
     }
 
-    #[test]
-    fn vecs_should_generate_same_output_given_same_input() {
-        should_generate_same_output_given_same_input(vecs(booleans()));
-    }
-
-    #[test]
-    fn vecs_usually_generates_different_output_for_different_inputs() {
-        usually_generates_different_output_for_different_inputs(vecs(booleans()))
-    }
-
-    #[test]
-    fn vec_bools_minimize_to_empty() {
-        env_logger::init().unwrap_or(());
-        should_minimize_to(vecs(booleans()), vec![])
-    }
-
-    #[test]
-    fn vec_bools_can_minimise_with_predicate() {
-        env_logger::init().unwrap_or(());
-        should_minimize_to(
-            vecs(booleans()).filter(|v| v.len() > 2),
-            vec![false, false, false],
-        );
-    }
-
-    #[test]
-    fn info_pools_should_generate_same_output_given_same_input() {
-        should_generate_same_output_given_same_input(info_pools(8))
-    }
-
-    #[test]
-    fn info_pools_usually_generates_different_output_for_different_inputs() {
-        usually_generates_different_output_for_different_inputs(info_pools(8))
-    }
-
-    #[test]
-    fn info_pools_minimize_to_empty() {
-        env_logger::init().unwrap_or(());
-        // We force the generator to output a fixed length.
-        // This is perhaps not the best idea ever; but it'll do for now.
-        should_minimize_to(info_pools(8), InfoPool::of_vec(vec![0; 8]))
-    }
-
-    #[test]
-    fn u8s_should_generate_same_output_given_same_input() {
-        should_generate_same_output_given_same_input(u8s())
-    }
-
-    // These really need to be proper statistical tests.
-    #[test]
-    fn u8s_usually_generates_different_output_for_different_inputs() {
-        usually_generates_different_output_for_different_inputs(u8s());
-    }
-
-    #[test]
-    fn u8s_minimize_to_zero() {
-        should_minimize_to(u8s(), 0);
-    }
-
-    #[test]
-    fn u8s_should_partially_order_same_as_source() {
-        should_partially_order_same_as_source(u8s());
-    }
-
-    #[test]
-    fn u64s_should_generate_same_output_given_same_input() {
-        should_generate_same_output_given_same_input(u64s())
-    }
-
-    // These really need to be proper statistical tests.
-    #[test]
-    fn u64s_usually_generates_different_output_for_different_inputs() {
-        usually_generates_different_output_for_different_inputs(u64s());
-    }
-
-    #[test]
-    fn u64s_minimize_to_zero() {
-        should_minimize_to(u64s(), 0);
-    }
-
-    #[test]
-    fn u64s_should_partially_order_same_as_source() {
-        should_partially_order_same_as_source(u64s());
-    }
-
-    #[test]
-    fn tuple_u8s_u8s_should_generate_same_output_given_same_input() {
-        should_generate_same_output_given_same_input((u8s(), u8s()))
-    }
-
-
-    #[test]
-    fn tuple_u8s_u8s_usually_generates_different_output_for_different_inputs() {
-        usually_generates_different_output_for_different_inputs((u8s(), u8s()));
-    }
-
-    #[test]
-    fn tuple_u8s_u8s_minimize_to_zero() {
-        should_minimize_to((u8s(), u8s()), (0, 0));
-    }
-
-    #[test]
-    fn tuple_u8s_u8s_should_partially_order_same_as_source() {
-        should_partially_order_same_as_source((u8s(), u8s()));
-    }
-
-    #[test]
-    fn i64s_should_generate_same_output_given_same_input() {
-        should_generate_same_output_given_same_input(i64s())
-    }
-
-    #[test]
-    fn i64s_usually_generates_different_output_for_different_inputs() {
-        usually_generates_different_output_for_different_inputs(i64s());
-    }
-
-    #[test]
-    fn i64s_minimize_to_zero() {
-        should_minimize_to(i64s(), 0);
-    }
-
-    #[test]
-    fn i64s_should_partially_order_same_as_source() {
-        should_partially_order_same_as_source_by(i64s(), |&v| v.abs());
-    }
 
     #[test]
     fn optional_u64s_minimize_to_none() {
@@ -1013,13 +567,6 @@ mod tests {
     fn result_u8_u64s_minimize_to_ok() {
         should_minimize_to(result(u8s(), u64s()), Ok(0));
     }
-
-    #[test]
-    fn collections_u64s_minimize_to_empty() {
-        use std::collections::BTreeSet;
-        should_minimize_to(collections::<BTreeSet<_>, _>(u8s()), BTreeSet::new());
-    }
-
 
     #[test]
     fn filter_should_pass_through_when_true() {
@@ -1075,120 +622,6 @@ mod tests {
         assert_eq!(gen.generate_from(&p), Err(DataError::SkipItem));
     }
 
-    mod vector_lengths {
-        use super::*;
-        use std::collections::BTreeMap;
-
-        #[test]
-        fn mean_length_can_be_set_as_10() {
-            mean_length_can_be_set_as(10);
-        }
-
-        #[test]
-        fn mean_length_can_be_set_as_3() {
-            mean_length_can_be_set_as(3);
-        }
-
-        #[test]
-        fn mean_length_can_be_set_as_5() {
-            mean_length_can_be_set_as(5);
-        }
-
-        #[test]
-        fn mean_length_can_be_set_as_7() {
-            mean_length_can_be_set_as(7);
-        }
-
-        #[test]
-        fn mean_length_can_be_set_as_23() {
-            mean_length_can_be_set_as(23);
-        }
-        fn mean_length_can_be_set_as(len: usize) {
-            env_logger::init().unwrap_or(());
-            let gen = vecs(u8s()).mean_length(len);
-            let trials = 1024usize;
-            let expected = len as f64;
-            let allowed_error = expected * 0.1;
-            let mut lengths = BTreeMap::new();
-            let p = unseeded_of_size(1 << 18);
-            let mut t = p.replay();
-            for _ in 0..trials {
-                let val = gen.generate(&mut t).expect("a trial");
-                *lengths.entry(val.len()).or_insert(0) += 1;
-            }
-
-            println!("Histogram: {:?}", lengths);
-            let mean: f64 = lengths
-                .iter()
-                .map(|(&l, &n)| (l * n) as f64 / trials as f64)
-                .sum();
-            assert!(
-                mean >= (expected - allowed_error) && mean <= (expected + allowed_error),
-                "Expected mean of {} trials ({}+/-{}); got {}",
-                trials,
-                expected,
-                allowed_error,
-                mean
-            );
-        }
-    }
-    mod collection_lengths {
-        use super::*;
-        use std::collections::{BTreeMap, LinkedList};
-
-        #[test]
-        fn mean_length_can_be_set_as_10() {
-            mean_length_can_be_set_as(10);
-        }
-
-        #[test]
-        fn mean_length_can_be_set_as_3() {
-            mean_length_can_be_set_as(3);
-        }
-
-        #[test]
-        fn mean_length_can_be_set_as_5() {
-            mean_length_can_be_set_as(5);
-        }
-
-        #[test]
-        fn mean_length_can_be_set_as_7() {
-            mean_length_can_be_set_as(7);
-        }
-
-        #[test]
-        fn mean_length_can_be_set_as_23() {
-            mean_length_can_be_set_as(23);
-        }
-        fn mean_length_can_be_set_as(len: usize) {
-            env_logger::init().unwrap_or(());
-            let gen = collections::<LinkedList<_>, _>(u8s()).mean_length(len);
-            let trials = 1024usize;
-            let expected = len as f64;
-            let allowed_error = expected * 0.1;
-            let mut lengths = BTreeMap::new();
-            let p = unseeded_of_size(1 << 18);
-            let mut t = p.replay();
-            for _ in 0..trials {
-                let val = gen.generate(&mut t).expect("a trial");
-                *lengths.entry(val.len()).or_insert(0) += 1;
-            }
-
-            println!("Histogram: {:?}", lengths);
-            let mean: f64 = lengths
-                .iter()
-                .map(|(&l, &n)| (l * n) as f64 / trials as f64)
-                .sum();
-            assert!(
-                mean >= (expected - allowed_error) && mean <= (expected + allowed_error),
-                "Expected mean of {} trials ({}+/-{}); got {}",
-                trials,
-                expected,
-                allowed_error,
-                mean
-            );
-        }
-    }
 
     #[test]
     fn one_of_should_pick_choices_relativey_evenly() {
