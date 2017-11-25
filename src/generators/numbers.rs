@@ -25,12 +25,12 @@ macro_rules! unsigned_integer_gen {
 
         impl Generator for IntGenerator<$ty> {
             type Item = $ty;
-            fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+            fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
                 assert!(size_of::<u8>() == 1);
                 let nbytes = size_of::<$ty>() / size_of::<u8>();
                 let mut val: $ty = 0;
                 for _ in 0..nbytes {
-                    val = val.wrapping_shl(8) | src.next().ok_or(DataError::PoolExhausted)?
+                    val = val.wrapping_shl(8) | src.draw_u8()
  as $ty;
                 }
                 Ok(val)
@@ -55,7 +55,7 @@ macro_rules! signed_integer_gen {
 
         impl Generator for IntGenerator<$ty> {
             type Item = $ty;
-            fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+            fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
                 let inner_g = $ugen;
                 let uval = inner_g.generate(src)?;
                 let is_neg = (uval & 1) == 0;
@@ -88,7 +88,7 @@ macro_rules! float_gen {
 
         impl Generator for FloatGenerator<$ty> {
             type Item = $ty;
-            fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+            fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
                 let inner_g = $ugen;
                 let uval = inner_g.generate(src)?;
 
@@ -118,7 +118,7 @@ macro_rules! uniform_float_gen {
 
         impl Generator for UniformFloatGenerator<$ty> {
             type Item = $ty;
-            fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+            fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
                 let inner_g = $ugen;
                 let uval = inner_g.generate(src)?;
                 return Ok(uval as $ty / $inty::max_value() as $ty);

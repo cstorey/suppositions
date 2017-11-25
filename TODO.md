@@ -94,7 +94,7 @@ fn stuff() {
 // Consumer
 impl<G: Generator> Generator for Foo<G> {
   fn generate<I: Iterator<Item = u8>>(&self, src: &mut ExtentTracker<I>) -> Maybe<Self::Item> {
-    while self.new_items()? {
+    while self.new_items(src)? {
       let v = self.inner.generate(&mut src.child());
       self.chunk(v);
     };
@@ -149,3 +149,39 @@ We want to be able to replay each level at a time. So If we shrink from a vector
 Put another way, when you stop consuming the sequence of (weighted_coin >> Foo), any Widget generators afterwards should get the same input. If we somehow end up consuming _more_ from the current branch, that branch should just return zeros once exhausted.
 
 Turn the minimizers into iterators?
+
+## Alternative; Hash/Rand style
+
+```rust
+enum Extent {
+  Leaf(usize), // Leaf Size
+  Branch(Vec<Extent>),
+}
+struct ExtentTracker<I> {
+  src: I,
+}
+
+trait InfoSource {
+  fn draw<G: Generator>(&mut src, gen: G) -> Maybe<G::Item>;
+  fn draw_u8(&mut src) -> Maybe<u8>;
+}
+
+// Top level consumer
+fn stuff() {
+  let mut tracker = ExtendTracker::new(pool.replay());
+  let val = tracker.draw(&self.gen);
+  // ... 
+  let root_extent = tracker.root();
+}
+
+// Consumer
+impl<G: Generator> Generator for Foo<G> {
+  fn generate<I: InfoSource>(&self, src: &mut ExtentTracker<I>) -> Maybe<Self::Item> {
+    while src.draw(self.has_next_gen())? {
+      let v = src.draw(&self.inner)
+      self.chunk(v);
+    };
+    Ok(...);
+  }
+}
+```

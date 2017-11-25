@@ -65,7 +65,7 @@ impl<G> VecGenerator<G> {
 
 impl<G: Generator> Generator for VecGenerator<G> {
     type Item = Vec<G::Item>;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let mut result = Vec::new();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
         let bs = weighted_coin(1.0 - p_is_final);
@@ -80,7 +80,7 @@ impl<G: Generator> Generator for VecGenerator<G> {
 
 impl Generator for InfoPoolGenerator {
     type Item = InfoPool;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let mut result = Vec::new();
         let vals = u8s();
         for _ in 0..self.0 {
@@ -102,7 +102,7 @@ impl<G, C> CollectionGenerator<C, G> {
 }
 impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerator<C, G> {
     type Item = C;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let mut coll: C = Default::default();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
         let bs = weighted_coin(1.0 - p_is_final);

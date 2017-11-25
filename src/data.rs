@@ -10,6 +10,26 @@ use hex_slice::AsHex;
 use rand::{random, Rng, XorShiftRng};
 use std::cmp::min;
 
+/// Something that an act as a source of test data.
+pub trait InfoSource {
+    /// Take a single byte from the source.
+    fn draw_u8(&mut self) -> u8;
+
+    /// Call F with access to the data source.
+    fn draw<F: Fn(&mut Self) -> R, R>(&mut self, f: F) -> R
+    where
+        Self: Sized,
+    {
+        f(self)
+    }
+}
+
+impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
+    fn draw_u8(&mut self) -> u8 {
+        (**self).draw_u8()
+    }
+}
+
 /// A pool of data that we can draw upon to generate other types of data.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InfoPool {
@@ -98,10 +118,9 @@ impl<'a> InfoTap<'a> {
 }
 
 
-impl<'a> Iterator for InfoTap<'a> {
-    type Item = u8;
-    fn next(&mut self) -> Option<u8> {
-        Some(self.next_byte())
+impl<'a> InfoSource for InfoTap<'a> {
+    fn draw_u8(&mut self) -> u8 {
+        self.next_byte()
     }
 }
 
@@ -116,10 +135,9 @@ impl<'a> InfoReplay<'a> {
 }
 
 
-impl<'a> Iterator for InfoReplay<'a> {
-    type Item = u8;
-    fn next(&mut self) -> Option<u8> {
-        Some(self.next_byte())
+impl<'a> InfoSource for InfoReplay<'a> {
+    fn draw_u8(&mut self) -> u8 {
+        self.next_byte()
     }
 }
 
@@ -362,21 +380,29 @@ mod tests {
     }
 
     #[test]
-    fn tap_can_act_as_iterator() {
+    fn tap_can_act_as_source() {
         let buf = vec![4, 3, 2, 1];
         let p = InfoPool::of_vec(buf.clone());
-        let _: &Iterator<Item = u8> = &p.replay();
-
-        assert_eq!(p.replay().take(4).collect::<Vec<_>>(), buf)
+        let _: &InfoSource = &p.replay();
+        let mut res = Vec::new();
+        let mut it = p.replay();
+        for _ in 0..4 {
+            res.push(it.draw_u8())
+        }
+        assert_eq!(res, buf)
     }
 
     #[test]
-    fn replay_can_act_as_iterator() {
+    fn replay_can_act_as_source() {
         let buf = vec![4, 3, 2, 1];
         let p = InfoPool::of_vec(buf.clone());
-        let _: &Iterator<Item = u8> = &p.replay();
 
-        assert_eq!(p.replay().take(4).collect::<Vec<_>>(), buf)
+        let mut res = Vec::new();
+        let mut it = p.replay();
+        for _ in 0..4 {
+            res.push(it.draw_u8())
+        }
+        assert_eq!(res, buf)
     }
 
     #[test]
@@ -387,12 +413,21 @@ mod tests {
         assert_eq!(min.as_ref().map(|p| p.buffer()), Some([].as_ref()))
     }
 
+    fn take_n<I: InfoSource>(mut src: I, n: usize) -> Vec<u8> {
+        let mut res = Vec::new();
+        for _ in 0..n {
+            res.push(src.draw_u8())
+        }
+        res
+    }
+
     #[test]
     fn minimiser_should_minimise_to_minimum_given_size() {
         env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec(vec![1; 4]);
-        let min = minimize(&p, &|t| t.take(16).filter(|&v| v > 0).count() > 1)
-            .expect("some smaller pool");
+        let min = minimize(&p, &|t| {
+            take_n(t, 16).into_iter().filter(|&v| v > 0).count() > 1
+        }).expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[1, 1])
     }
@@ -400,14 +435,16 @@ mod tests {
     #[test]
     fn minimiser_should_minimise_scalar_values() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|t| t.take(16).any(|v| v >= 3)).expect("some smaller pool");
+        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 3))
+            .expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[3])
     }
     #[test]
     fn minimiser_should_minimise_scalar_values_to_empty() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|t| t.take(16).any(|_| true)).expect("some smaller pool");
+        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|_| true))
+            .expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[] as &[u8])
     }
@@ -415,14 +452,16 @@ mod tests {
     #[test]
     fn minimiser_should_minimise_scalar_values_by_search() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|t| t.take(16).any(|v| v >= 13)).expect("some smaller pool");
+        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 13))
+            .expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[13])
     }
     #[test]
     fn minimiser_should_minimise_scalar_values_accounting_for_overflow() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|t| t.take(16).any(|v| v >= 251)).expect("some smaller pool");
+        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 251))
+            .expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[251])
     }

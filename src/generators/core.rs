@@ -36,11 +36,7 @@ pub trait OneOfItem {
     /// [`Generator`](trait.Generator.html) ipmlementation for
     /// (`OneOfGenerator`)[struct.OneOfGenerator.html], we either call our
     /// generator directly, or delegate to the next in the chain.
-    fn generate_or_delegate<I: Iterator<Item = u8>>(
-        &self,
-        depth: usize,
-        tap: &mut I,
-    ) -> Maybe<Self::Item>;
+    fn generate_or_delegate<I: InfoSource>(&self, depth: usize, tap: &mut I) -> Maybe<Self::Item>;
 }
 
 /// Internal implementation for [`one_of`](fn.one_of.html). Forms the
@@ -80,7 +76,7 @@ pub trait Generator {
     type Item;
     /// This consumes a stream of bytes given by `source`, and generates a
     /// value of type `Self::Item`.
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item>;
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item>;
     /// A convenience function to generate a value directly from an `InfoPool`.
     fn generate_from(&self, src: &InfoPool) -> Maybe<Self::Item> {
         self.generate(&mut src.replay())
@@ -122,7 +118,7 @@ pub trait GeneratorObject {
     type Item;
     /// This consumes a stream of bytes given by `source`, and generates a
     /// value of type `Self::Item`.
-    fn generate_obj(&self, src: &mut Iterator<Item = u8>) -> Maybe<Self::Item>;
+    fn generate_obj(&self, src: &mut InfoSource) -> Maybe<Self::Item>;
 }
 
 /// An extension trait that allows use of methods that assume Self has a known
@@ -147,15 +143,15 @@ where
 
 impl<G: Generator> GeneratorObject for G {
     type Item = G::Item;
-    fn generate_obj(&self, mut src: &mut Iterator<Item = u8>) -> Maybe<Self::Item> {
+    fn generate_obj(&self, mut src: &mut InfoSource) -> Maybe<Self::Item> {
         (*self).generate(&mut src)
     }
 }
 
 impl<T> Generator for Box<GeneratorObject<Item = T>> {
     type Item = T;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        (**self).generate_obj(src as &mut Iterator<Item = u8>)
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        (**self).generate_obj(src as &mut InfoSource)
     }
 }
 
@@ -163,8 +159,6 @@ impl<T> Generator for Box<GeneratorObject<Item = T>> {
 pub fn booleans() -> BoolGenerator {
     BoolGenerator
 }
-
-
 
 /// Always generates a clone of the given value.
 pub fn consts<V: Clone>(val: V) -> Const<V> {
@@ -197,17 +191,15 @@ pub fn lazy<F: Fn() -> G, G: Generator>(thunk: F) -> LazyGenerator<F> {
 
 impl Generator for BoolGenerator {
     type Item = bool;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        src.next().map(|val| val >= 0x80).ok_or(
-            DataError::PoolExhausted,
-        )
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        Ok(src.draw_u8() >= 0x80)
     }
 }
 
 
 impl<G: Generator> Generator for OptionalGenerator<G> {
     type Item = Option<G::Item>;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let bs = booleans();
         let result = if bs.generate(src)? {
             Some(self.0.generate(src)?)
@@ -221,7 +213,7 @@ impl<G: Generator> Generator for OptionalGenerator<G> {
 
 impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
     type Item = Result<G::Item, H::Item>;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &ResultGenerator(ref ok, ref err) = self;
         let bs = booleans();
         let result = if bs.generate(src)? {
@@ -236,7 +228,7 @@ impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
 
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &Filtered(ref gen, ref pred) = self;
         let val = gen.generate(src)?;
         if pred(&val) {
@@ -249,7 +241,7 @@ impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
 
 impl<G: Generator, R, F: Fn(G::Item) -> Maybe<R>> Generator for FilterMapped<G, F> {
     type Item = R;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &FilterMapped(ref gen, ref f) = self;
         let val = gen.generate(src)?;
         let out = f(val)?;
@@ -259,7 +251,7 @@ impl<G: Generator, R, F: Fn(G::Item) -> Maybe<R>> Generator for FilterMapped<G, 
 
 impl<G: Generator, R, F: Fn(G::Item) -> R> Generator for Mapped<G, F> {
     type Item = R;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &Mapped(ref gen, ref f) = self;
         let val = gen.generate(src)?;
         let out = f(val);
@@ -269,14 +261,14 @@ impl<G: Generator, R, F: Fn(G::Item) -> R> Generator for Mapped<G, F> {
 
 impl<V: Clone> Generator for Const<V> {
     type Item = V;
-    fn generate<I: Iterator<Item = u8>>(&self, _: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, _: &mut I) -> Maybe<Self::Item> {
         Ok(self.0.clone())
     }
 }
 
 impl Generator for WeightedCoinGenerator {
     type Item = bool;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &WeightedCoinGenerator(p) = self;
         let v = uniform_f32s().generate(src)?;
         let res = v > (1.0 - p);
@@ -316,7 +308,7 @@ impl<GS: OneOfItem> OneOfGenerator<GS> {
 
 impl<F: Fn() -> G, G: Generator> Generator for LazyGenerator<F> {
     type Item = G::Item;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let g = self.0();
         g.generate(src)
     }
@@ -328,11 +320,7 @@ impl<G: Generator, R: OneOfItem<Item = G::Item>> OneOfItem for OneOfSnoc<G, R> {
     fn len(&self) -> usize {
         self.rest.len() + 1
     }
-    fn generate_or_delegate<I: Iterator<Item = u8>>(
-        &self,
-        depth: usize,
-        tap: &mut I,
-    ) -> Maybe<Self::Item> {
+    fn generate_or_delegate<I: InfoSource>(&self, depth: usize, tap: &mut I) -> Maybe<Self::Item> {
         if depth == 0 {
             self.gen.generate(tap)
         } else {
@@ -346,11 +334,7 @@ impl<G: Generator> OneOfItem for OneOfTerm<G> {
     fn len(&self) -> usize {
         1
     }
-    fn generate_or_delegate<I: Iterator<Item = u8>>(
-        &self,
-        depth: usize,
-        tap: &mut I,
-    ) -> Maybe<Self::Item> {
+    fn generate_or_delegate<I: InfoSource>(&self, depth: usize, tap: &mut I) -> Maybe<Self::Item> {
         debug_assert_eq!(depth, 0);
         self.gen.generate(tap)
     }
@@ -358,7 +342,7 @@ impl<G: Generator> OneOfItem for OneOfTerm<G> {
 
 impl<GS: OneOfItem> Generator for OneOfGenerator<GS> {
     type Item = GS::Item;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let v = !u32s().generate(src)?;
         let it = (v as usize * self.0.len()) >> 32;
         self.0.generate_or_delegate(it, src)
