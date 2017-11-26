@@ -76,9 +76,11 @@ where
         let mut tests_run = 0usize;
         let mut items_skipped = 0usize;
         while tests_run < self.config.num_tests {
-            let mut pool = InfoPool::new();
+            let mut pool = InfoRecorder::new(RngSource::new());
             trace!("Tests run: {}; skipped:{}", tests_run, items_skipped);
-            match self.gen.generate(&mut pool.tap()) {
+            let result = self.gen.generate(&mut pool);
+            let pool = pool.into_pool();
+            match result {
                 Ok(arg) => {
                     let res = Self::attempt(&subject, arg);
                     trace!(

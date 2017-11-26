@@ -510,13 +510,14 @@ pub mod tests {
     {
         let mut p;
         loop {
-            p = InfoPool::new();
-            match gen.generate(&mut p.tap()) {
+            p = InfoRecorder::new(RngSource::new());
+            match gen.generate(&mut p) {
                 Ok(_) => break,
                 Err(DataError::SkipItem) => (),
                 Err(DataError::PoolExhausted) => panic!("Not enough pool to generate data"),
             }
         }
+        let p = p.into_pool();
         debug!("Before: {:?}", p);
         let p = find_minimal(&gen, p, |_| true);
         debug!("After: {:?}", p);
