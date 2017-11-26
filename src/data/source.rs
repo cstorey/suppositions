@@ -2,8 +2,11 @@ use std::fmt;
 use hex_slice::AsHex;
 use rand::{random, Rng, XorShiftRng};
 
+/// Something that can extract information from an `InfoSource`.
 pub trait InfoSink {
+    /// The output data.
     type Out;
+    /// Called by [InfoSource::draw](trait.InfoSource.html#tymethod.draw)
     fn sink<I: InfoSource>(&mut self, i: &mut I) -> Self::Out;
 }
 
@@ -159,7 +162,6 @@ impl<'a> InfoSource for InfoReplay<'a> {
 mod tests {
     extern crate env_logger;
     use super::*;
-    use std::collections::BTreeMap;
 
     #[test]
     fn should_take_each_item_in_pool() {
