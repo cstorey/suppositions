@@ -1,6 +1,8 @@
 use std::fmt;
 use hex_slice::AsHex;
 use rand::{random, Rng, XorShiftRng};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 /// Something that can extract information from an `InfoSource`.
 pub trait InfoSink {
@@ -26,10 +28,15 @@ pub struct RngSource<R> {
     rng: R,
 }
 
+enum DataChunk {
+    Leaf(Vec<u8>),
+    Branch(Vec<DataChunk>),
+}
+
 /// An adapter that can record the data drawn from an underlying source.
 pub struct InfoRecorder<I> {
-    inner: I,
-    data: Vec<u8>,
+    inner: Rc<RefCell<I>>,
+    data: Vec<DataChunk>,
 }
 
 impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
@@ -47,27 +54,76 @@ impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
 impl<I> InfoRecorder<I> {
     /// Creates a recording InfoSource.
     pub fn new(inner: I) -> Self {
-        let data = Vec::new();
-        InfoRecorder { inner, data }
+        InfoRecorder {
+            inner: Rc::new(RefCell::new(inner)),
+            data: Vec::new(),
+        }
     }
 
     /// Extracts the data recorded.
     pub fn into_pool(self) -> InfoPool {
-        InfoPool::of_vec(self.data)
+        let mut data = Vec::new();
+        self.flatten_to(&mut data);
+        InfoPool::of_vec(data)
+    }
+
+    // This will go away once we integrate the tree structure into the
+    // shrinky bits.
+    fn flatten_to(&self, dst: &mut Vec<u8>) {
+        for chunk in self.data.iter() {
+            chunk.flatten_to(dst)
+        }
+    }
+
+    fn into_chunk(self) -> DataChunk {
+        DataChunk::Branch(self.data)
+    }
+}
+
+impl DataChunk {
+    fn flatten_to(&self, dst: &mut Vec<u8>) {
+        match self {
+            &DataChunk::Leaf(ref v) => dst.extend(v),
+            &DataChunk::Branch(ref brs) => {
+                for br in brs {
+                    br.flatten_to(dst)
+                }
+            }
+        }
     }
 }
 
 impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     fn draw_u8(&mut self) -> u8 {
-        let byte = self.inner.draw_u8();
-        self.data.push(byte);
+        let byte = self.inner.borrow_mut().draw_u8();
+        let last_elt = self.data.pop().unwrap_or_else(|| DataChunk::Leaf(vec![]));
+
+        let (prevp, last_elt) = match last_elt {
+            DataChunk::Leaf(mut v) => {
+                v.push(byte);
+                (None, DataChunk::Leaf(v))
+            }
+            br @ DataChunk::Branch(_) => (Some(br), DataChunk::Leaf(vec![byte])),
+        };
+
+        if let Some(prev) = prevp {
+            self.data.push(prev);
+        };
+        self.data.push(last_elt);
         byte
     }
+
     fn draw<S: InfoSink>(&mut self, mut sink: S) -> S::Out
     where
         Self: Sized,
     {
-        sink.sink(self)
+        let mut child = InfoRecorder {
+            inner: self.inner.clone(),
+            data: Vec::new(),
+        };
+        let res = sink.sink(&mut child);
+        self.data.push(child.into_chunk());
+        res
     }
 }
 
@@ -236,6 +292,72 @@ mod tests {
 
         assert_eq!(v0, v1)
     }
+
+    #[test]
+    fn should_allow_restarting_child_reads() {
+        struct FnSink<F>(F);
+        impl<F: FnMut(&mut InfoSource) -> R, R> InfoSink for FnSink<F> {
+            type Out = R;
+            fn sink<I: InfoSource>(&mut self, k: &mut I) -> R {
+                (self.0)(k as &mut InfoSource)
+            }
+        }
+
+        let mut p = InfoRecorder::new(RngSource::new());
+        let mut v0 = Vec::new();
+        p.draw(FnSink(|src: &mut InfoSource| for _ in 0..4 {
+            let x: u8 = src.draw_u8();
+            v0.push(x);
+        }));
+
+        let p = p.into_pool();
+        let mut t = p.replay();
+        let mut v1 = Vec::new();
+        for _ in 0..4 {
+            v1.push(t.draw_u8())
+        }
+
+        assert_eq!(v0, v1)
+    }
+
+    #[test]
+    fn should_allow_restarting_mixed_child_reads() {
+        struct FnSink<F>(F);
+        impl<F: FnMut(&mut InfoSource) -> R, R> InfoSink for FnSink<F> {
+            type Out = R;
+            fn sink<I: InfoSource>(&mut self, k: &mut I) -> R {
+                (self.0)(k as &mut InfoSource)
+            }
+        }
+
+        let mut p = InfoRecorder::new(RngSource::new());
+        let mut v0 = Vec::new();
+
+        for _ in 0..2 {
+            let x: u8 = p.draw_u8();
+            v0.push(x);
+        }
+
+        p.draw(FnSink(|src: &mut InfoSource| for _ in 0..4 {
+            let x: u8 = src.draw_u8();
+            v0.push(x);
+        }));
+
+        for _ in 0..2 {
+            let x: u8 = p.draw_u8();
+            v0.push(x);
+        }
+
+        let p = p.into_pool();
+        let mut t = p.replay();
+        let mut v1 = Vec::new();
+        for _ in 0..8 {
+            v1.push(t.draw_u8())
+        }
+
+        assert_eq!(v0, v1)
+    }
+
 
     #[test]
     fn should_allow_borrowing_buffer() {

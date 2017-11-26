@@ -76,7 +76,8 @@ where
         let mut tests_run = 0usize;
         let mut items_skipped = 0usize;
         while tests_run < self.config.num_tests {
-            let mut pool = InfoRecorder::new(RngSource::new());
+            let mut src = RngSource::new();
+            let mut pool = InfoRecorder::new(&mut src);
             trace!("Tests run: {}; skipped:{}", tests_run, items_skipped);
             let result = self.gen.generate(&mut pool);
             let pool = pool.into_pool();
