@@ -66,6 +66,12 @@ pub fn property<G: Generator>(gen: G) -> Property<G> {
     CheckConfig::default().property(gen)
 }
 
+#[derive(Debug, Clone, Default)]
+struct Stats {
+    tests_run: usize,
+    items_skipped: usize,
+}
+
 impl<G: Generator> Property<G>
 where
     G::Item: fmt::Debug,
@@ -73,52 +79,61 @@ where
     /// Use this function to sepecify the thing you wish to check. Because we include the
     /// debug representation of the input and the output within the
     pub fn check<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(self, subject: F) {
-        let mut tests_run = 0usize;
-        let mut items_skipped = 0usize;
-        while tests_run < self.config.num_tests {
-            let mut pool = InfoPool::new();
-            trace!("Tests run: {}; skipped:{}", tests_run, items_skipped);
-            match self.gen.generate(&mut pool.tap()) {
-                Ok(arg) => {
-                    let res = Self::attempt(&subject, arg);
-                    trace!(
-                        "Result: {:?} -> {:?}",
-                        self.gen.generate(&mut pool.replay()),
-                        res
-                    );
-                    tests_run += 1;
-                    if res.is_failure() {
-                        let minpool = find_minimal(
-                            &self.gen,
-                            pool,
-                            |v| Self::attempt(&subject, v).is_failure(),
-                        );
-                        panic!(
-                            "Predicate failed for argument {:?}; check returned {:?}",
-                            self.gen.generate(&mut minpool.replay()),
-                            res
-                        )
-                    }
-                }
-                Err(DataError::SkipItem) => {
-                    trace!("Skip: {:?}", self.gen.generate(&mut pool.replay()));
-                    items_skipped += 1;
-                    if items_skipped >= self.config.max_skips {
-                        panic!(
-                            "Could not finish on {}/{} tests (have skipped {} times)",
-                            tests_run,
-                            self.config.num_tests,
-                            items_skipped
-                        );
-                    }
-                }
-                Err(e) => {
-                    trace!("Gen failure: {:?}", self.gen.generate(&mut pool.replay()));
-                    debug!("{:?}", e);
-                }
-            }
+        let mut stats = Stats::default();
+        while stats.tests_run < self.config.num_tests {
+            trace!("Tests run: {}; skipped:{}", stats.tests_run, stats.items_skipped);
+            self.try_one(&mut stats, &subject)
         }
         trace!("Completing okay");
+    }
+
+    fn try_one<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(
+            &self, stats: &mut Stats, subject: &F) {
+        let mut pool = InfoPool::new();
+        match self.gen.generate(&mut pool.tap()) {
+            Ok(arg) => {
+                stats.tests_run += 1;
+                self.try_example(subject, pool, arg)
+            }
+            Err(DataError::SkipItem) => {
+                stats.items_skipped += 1;
+                trace!("Skip");
+
+                if stats.items_skipped >= self.config.max_skips {
+                    panic!(
+                        "Could not finish on {}/{} tests (have skipped {} times)",
+                        stats.tests_run,
+                        self.config.num_tests,
+                        stats.items_skipped
+                    );
+                }
+            }
+            Err(e) => {
+                debug!("Data generation failure: {:?}", e);
+            }
+        }
+    }
+
+    fn try_example<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(&self, subject: &F, pool: InfoPool, arg: G::Item) {
+        let res = Self::attempt(&subject, arg);
+        trace!(
+            "Result: {:?} -> {:?}",
+            self.gen.generate(&mut pool.replay()),
+            res
+        );
+        if res.is_failure() {
+            let minpool = find_minimal(
+                &self.gen,
+                pool,
+                |v| Self::attempt(&subject, v).is_failure(),
+            );
+            panic!(
+                "Predicate failed for argument {:?}; check returned {:?}",
+                self.gen.generate(&mut minpool.replay()),
+                res
+            )
+        }
+
     }
 
     fn attempt<R: CheckResult, F: Fn(G::Item) -> R>(subject: F, arg: G::Item) -> Result<R, String> {
