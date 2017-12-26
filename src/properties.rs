@@ -125,8 +125,15 @@ where
             let minpool = find_minimal(
                 &self.gen,
                 pool,
-                |v| Self::attempt(&subject, v).is_failure(),
+                |v| {
+                    trace!("Shrink attempt: {:?}", v);
+                    let res = Self::attempt(&subject, v);
+                    trace!("Shrink attempt -> {:?}", res);
+                    res.is_failure()
+                    },
             );
+            trace!("Minpool: {:?}", minpool);
+            trace!("Values: {:?}", self.gen.generate(&mut minpool.replay()));
             panic!(
                 "Predicate failed for argument {:?}; check returned {:?}",
                 self.gen.generate(&mut minpool.replay()),
