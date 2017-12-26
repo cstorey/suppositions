@@ -13,7 +13,7 @@ pub struct BoolGenerator;
 pub struct WeightedCoinGenerator(f32);
 /// See [`optional`](fn.optional.html)
 #[derive(Debug, Clone)]
-pub struct OptionalGenerator<G>(G);
+pub struct OptionalGenerator<B, G>(B, G);
 /// See [`result`](fn.result.html)
 #[derive(Debug, Clone)]
 pub struct ResultGenerator<G, H>(G, H);
@@ -179,8 +179,14 @@ pub fn weighted_coin(p: f32) -> WeightedCoinGenerator {
 
 /// Generates an Optional<_> value with a 50% chance of `Some(_)` from the
 /// `inner` generator, otherwise None.
-pub fn optional<G>(inner: G) -> OptionalGenerator<G> {
-    OptionalGenerator(inner)
+pub fn optional<G>(inner: G) -> OptionalGenerator<BoolGenerator, G> {
+    OptionalGenerator(booleans(), inner)
+}
+
+/// Generates an Optional<_> value using `bools` to decide whether to choose
+/// `Some(_)` from the `inner` generator, otherwise None.
+pub fn optional_by<B, G>(bools: B, inner: G) -> OptionalGenerator<B, G> {
+    OptionalGenerator(bools, inner)
 }
 
 /// Generates either an okay value from `ok`; or an error from `err`, with 50% chance of each.
@@ -203,12 +209,12 @@ impl Generator for BoolGenerator {
     }
 }
 
-impl<G: Generator> Generator for OptionalGenerator<G> {
+impl<B: Generator<Item=bool>, G: Generator> Generator for OptionalGenerator<B, G> {
     type Item = Option<G::Item>;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        let bs = booleans();
-        let result = if src.draw(&bs)? {
-            Some(src.draw(&self.0)?)
+        let &OptionalGenerator(ref bools, ref gen) = self;
+        let result = if src.draw(bools)? {
+            Some(src.draw(gen)?)
         } else {
             None
         };
@@ -552,6 +558,15 @@ pub mod tests {
     fn optional_u64s_minimize_to_none() {
         should_minimize_to(optional(u64s()), None);
     }
+
+    #[test]
+    fn optional_by_coin_of_u64s_minimize_to_none() {
+        let gen = optional_by(
+                weighted_coin(3.0f32/4.0),
+                u64s());
+        should_minimize_to(gen, None);
+    }
+
 
 
     #[test]
