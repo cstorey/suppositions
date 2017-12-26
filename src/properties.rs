@@ -92,6 +92,7 @@ where
         let mut src = RngSource::new();
         let mut pool = InfoRecorder::new(&mut src);
         let result = self.gen.generate(&mut pool);
+        trace!("Pool: {:?}", pool);
         let pool = pool.into_pool();
         match result {
             Ok(arg) => {

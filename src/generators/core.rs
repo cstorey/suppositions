@@ -201,6 +201,12 @@ pub fn lazy<F: Fn() -> G, G: Generator>(thunk: F) -> LazyGenerator<F> {
     LazyGenerator(thunk)
 }
 
+impl<'a, G: Generator> Generator for &'a G {
+    type Item = G::Item;
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        (**self).generate(src)
+    }
+}
 
 impl Generator for BoolGenerator {
     type Item = bool;

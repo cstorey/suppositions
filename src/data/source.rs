@@ -24,19 +24,22 @@ pub trait InfoSource {
 }
 
 /// Generates data from an underlying Rng instance.
+#[derive(Debug)]
 pub struct RngSource<R> {
     rng: R,
 }
 
-enum DataChunk {
+#[derive(Debug)]
+pub(crate) enum DataChunk {
     Leaf(Vec<u8>),
     Branch(Vec<DataChunk>),
 }
 
 /// An adapter that can record the data drawn from an underlying source.
+#[derive(Debug)]
 pub struct InfoRecorder<I> {
     inner: Rc<RefCell<I>>,
-    data: Vec<DataChunk>,
+    pub(crate) data: Vec<DataChunk>,
 }
 
 impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {

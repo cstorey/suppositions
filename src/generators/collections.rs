@@ -68,9 +68,8 @@ impl<G: Generator> Generator for VecGenerator<G> {
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let mut result = Vec::new();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
-        let bs = weighted_coin(1.0 - p_is_final);
-        while bs.generate(src)? {
-            let item = self.inner.generate(src)?;
+        let opts = optional_by(weighted_coin(1.0 - p_is_final), &self.inner);
+        while let Some(item) = src.draw(&opts)? {
             result.push(item)
         }
 
@@ -105,9 +104,8 @@ impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerat
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let mut coll: C = Default::default();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
-        let bs = weighted_coin(1.0 - p_is_final);
-        while bs.generate(src)? {
-            let item = self.inner.generate(src)?;
+        let opts = optional_by(weighted_coin(1.0 - p_is_final), &self.inner);
+        while let Some(item) = src.draw(&opts)? {
             coll.extend(iter::once(item));
         }
 
@@ -117,6 +115,7 @@ impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerat
 
 #[cfg(test)]
 mod tests {
+    use std::collections::LinkedList;
     use env_logger;
     use generators::core::*;
     use generators::collections::*;
@@ -130,6 +129,20 @@ mod tests {
     #[test]
     fn vecs_usually_generates_different_output_for_different_inputs() {
         usually_generates_different_output_for_different_inputs(vecs(booleans()))
+    }
+    #[test]
+    fn vecs_records_at_least_as_many_leaves_as_elements() {
+        let nitems = 100;
+        let gen = vecs(booleans());
+        for _ in 0..nitems {
+            let mut src = RngSource::new();
+            let mut rec = InfoRecorder::new(&mut src);
+            let val = gen.generate(&mut rec).expect("generate");
+
+            let nchunks = rec.data.len();
+            assert!(nchunks == val.len() + 1,
+                    "nchunks:{} == val.len:{}", nchunks, val.len());
+        }
     }
 
     #[test]
@@ -169,6 +182,23 @@ mod tests {
         use std::collections::BTreeSet;
         should_minimize_to(collections::<BTreeSet<_>, _>(u8s()), BTreeSet::new());
     }
+
+    #[test]
+    fn collections_records_at_least_as_many_leaves_as_elements() {
+        let nitems = 100;
+        let gen = collections::<LinkedList<_>, _>(u64s());
+        for _ in 0..nitems {
+            let mut src = RngSource::new();
+            let mut rec = InfoRecorder::new(&mut src);
+            let val = gen.generate(&mut rec).expect("generate");
+
+            let nchunks = rec.data.len();
+            assert!(nchunks == val.len() + 1,
+                    "nchunks:{} == val.len:{}", nchunks, val.len());
+        }
+    }
+
+
 
     mod vector_lengths {
         use env_logger;
