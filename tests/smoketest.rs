@@ -100,3 +100,44 @@ fn trivial_panic_failure() {
 fn panic_includes_failure_message() {
     property((booleans())).check(|_| -> () { panic!("Big bad boom") })
 }
+
+/*
+Currently fails with:
+```
+    thread 'panic_includes_minimal_example' panicked at 'Predicate failed for argument Ok(72057594037927936); check returned Ok(false)', src/properties.rs:137:12
+    note: Panic did not include expected string '123457890'
+```
+
+This occurs because:
+ * We shrink by removal before we shrink by value
+ * We backfill empty chunks from the iterator with zeroes
+ * So, this fails on 72057594037927936, or 0x100000000000000 with a single-byte pool.
+*/
+#[ignore]
+#[test]
+#[should_panic(expected = "12345")]
+fn panic_includes_minimal_example_padding_error() {
+    env_logger::init().unwrap_or(());
+    property(u64s()).check(|n| n < 12345);
+}
+
+/*
+Currently fails with:
+```
+---- panic_includes_minimal_example_rounding_errors stdout ----
+        thread 'panic_includes_minimal_example_rounding_errors' panicked at 'Predicate failed for argument Ok(1245187); check returned Ok(false)', src/properties.rs:137:12
+note: Panic did not include expected string '1234567'
+```
+
+This occurrs because:
+ * We shrink each individual pool byte in turn,
+ * So 0x101 may fail, but 0x001 won't, even if 0x0f1 would.
+*/
+
+#[ignore]
+#[test]
+#[should_panic(expected = "1234567")]
+fn panic_includes_minimal_example_rounding_errors() {
+    env_logger::init().unwrap_or(());
+    property(u64s()).check(|n| !((n & 1 == 1) && n >= 1234567));
+}

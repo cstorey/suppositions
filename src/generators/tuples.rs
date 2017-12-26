@@ -17,6 +17,7 @@ macro_rules! tuple_generator_impl {
     );
 }
 
+tuple_generator_impl!(ga: a: A);
 tuple_generator_impl!(ga: a: A, gb: b: B);
 tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C);
 tuple_generator_impl!(ga: a: A, gb: b: B, gc: c: C, gd: d: D);

@@ -267,7 +267,7 @@ mod tests {
         let p = InfoPool::of_vec((0..256usize).map(|v| v as u8).collect::<Vec<_>>());
         let mut counts = BTreeMap::new();
         for val in ScalarShrinker::new(p) {
-            let mut ent = counts.entry(val.clone()).or_insert(0);
+            let ent = counts.entry(val.clone()).or_insert(0);
             *ent += 1;
             if *ent > 1 {
                 debug!("Dup! {}: {:?}", *ent, val);
