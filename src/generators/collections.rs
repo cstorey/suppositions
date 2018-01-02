@@ -102,6 +102,7 @@ impl<G, C> CollectionGenerator<C, G> {
 impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerator<C, G> {
     type Item = C;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        trace!("-> CollectionGenerator::generate");
         let mut coll: C = Default::default();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
         let opts = optional_by(weighted_coin(1.0 - p_is_final), &self.inner);
@@ -109,6 +110,7 @@ impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerat
             coll.extend(iter::once(item));
         }
 
+        trace!("<- CollectionGenerator::generate");
         Ok(coll)
     }
 }
@@ -130,18 +132,47 @@ mod tests {
     fn vecs_usually_generates_different_output_for_different_inputs() {
         usually_generates_different_output_for_different_inputs(vecs(booleans()))
     }
+
+    #[derive(Debug)]
+    struct Tracer<'a, I: 'a> {
+        inner: &'a mut I,
+        child_draws: usize,
+    }
+
+    impl<'a, I> Tracer<'a, I> {
+        fn new(inner: &'a mut I) -> Self {
+            let child_draws = 0;
+            Tracer { inner, child_draws }
+        }
+    }
+
+    impl<'a, I: InfoSource> InfoSource for Tracer<'a, I> {
+        fn draw_u8(&mut self) -> u8 {
+            self.inner.draw_u8()
+        }
+        fn draw<S: InfoSink>(&mut self, sink: S) -> S::Out
+            where
+            Self: Sized {
+            trace!("-> Tracer::draw");
+            self.child_draws += 1;
+            let res = self.inner.draw(sink);
+            trace!("<- Tracer::draw");
+            res
+        }
+    }
+
     #[test]
     fn vecs_records_at_least_as_many_leaves_as_elements() {
+        env_logger::init().unwrap_or(());
         let nitems = 100;
         let gen = vecs(booleans());
         for _ in 0..nitems {
             let mut src = RngSource::new();
-            let mut rec = InfoRecorder::new(&mut src);
+            let mut rec = Tracer::new(&mut src);
             let val = gen.generate(&mut rec).expect("generate");
 
-            let nchunks = rec.data.len();
-            assert!(nchunks == val.len() + 1,
-                    "nchunks:{} == val.len:{}", nchunks, val.len());
+            assert!(rec.child_draws == val.len() + 1,
+                    "child_draws:{} == val.len:{}", rec.child_draws, val.len());
         }
     }
 
@@ -189,12 +220,11 @@ mod tests {
         let gen = collections::<LinkedList<_>, _>(u64s());
         for _ in 0..nitems {
             let mut src = RngSource::new();
-            let mut rec = InfoRecorder::new(&mut src);
+            let mut rec = Tracer::new(&mut src);
             let val = gen.generate(&mut rec).expect("generate");
 
-            let nchunks = rec.data.len();
-            assert!(nchunks == val.len() + 1,
-                    "nchunks:{} == val.len:{}", nchunks, val.len());
+            assert!(rec.child_draws == val.len() + 1,
+                    "child_draws:{} == val.len:{}", rec.child_draws, val.len());
         }
     }
 

@@ -29,17 +29,11 @@ pub struct RngSource<R> {
     rng: R,
 }
 
-#[derive(Debug)]
-pub(crate) enum DataChunk {
-    Leaf(Vec<u8>),
-    Branch(Vec<DataChunk>),
-}
-
 /// An adapter that can record the data drawn from an underlying source.
 #[derive(Debug)]
 pub struct InfoRecorder<I> {
     inner: Rc<RefCell<I>>,
-    pub(crate) data: Vec<DataChunk>,
+    pub(crate) data: Vec<u8>,
 }
 
 impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
@@ -65,54 +59,15 @@ impl<I> InfoRecorder<I> {
 
     /// Extracts the data recorded.
     pub fn into_pool(self) -> InfoPool {
-        let mut data = Vec::new();
-        self.flatten_to(&mut data);
-        InfoPool::of_vec(data)
-    }
-
-    // This will go away once we integrate the tree structure into the
-    // shrinky bits.
-    fn flatten_to(&self, dst: &mut Vec<u8>) {
-        for chunk in self.data.iter() {
-            chunk.flatten_to(dst)
-        }
-    }
-
-    fn into_chunk(self) -> DataChunk {
-        DataChunk::Branch(self.data)
+        InfoPool::of_vec(self.data)
     }
 }
 
-impl DataChunk {
-    fn flatten_to(&self, dst: &mut Vec<u8>) {
-        match self {
-            &DataChunk::Leaf(ref v) => dst.extend(v),
-            &DataChunk::Branch(ref brs) => {
-                for br in brs {
-                    br.flatten_to(dst)
-                }
-            }
-        }
-    }
-}
 
 impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     fn draw_u8(&mut self) -> u8 {
         let byte = self.inner.borrow_mut().draw_u8();
-        let last_elt = self.data.pop().unwrap_or_else(|| DataChunk::Leaf(vec![]));
-
-        let (prevp, last_elt) = match last_elt {
-            DataChunk::Leaf(mut v) => {
-                v.push(byte);
-                (None, DataChunk::Leaf(v))
-            }
-            br @ DataChunk::Branch(_) => (Some(br), DataChunk::Leaf(vec![byte])),
-        };
-
-        if let Some(prev) = prevp {
-            self.data.push(prev);
-        };
-        self.data.push(last_elt);
+        self.data.push(byte);
         byte
     }
 
@@ -120,12 +75,9 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     where
         Self: Sized,
     {
-        let mut child = InfoRecorder {
-            inner: self.inner.clone(),
-            data: Vec::new(),
-        };
-        let res = sink.sink(&mut child);
-        self.data.push(child.into_chunk());
+        trace!("-> InfoSource::draw");
+        let res = sink.sink(self);
+        trace!("<- InfoSource::draw");
         res
     }
 }
