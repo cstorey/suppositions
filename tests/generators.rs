@@ -1,6 +1,6 @@
-extern crate suppositions;
-extern crate log;
 extern crate env_logger;
+extern crate log;
+extern crate suppositions;
 
 use suppositions::*;
 use suppositions::generators::*;
@@ -27,9 +27,8 @@ fn i64s_should_partially_order_same_as_source() {
         (info_pools(16), info_pools(16))
             .filter(|&(ref p0, ref p1)| p0.buffer() < p1.buffer())
             .filter_map(|(p0, p1)| {
-                gen.generate(&mut p0.replay()).and_then(|v0| {
-                    gen.generate(&mut p1.replay()).map(|v1| (v0, v1))
-                })
+                gen.generate(&mut p0.replay())
+                    .and_then(|v0| gen.generate(&mut p1.replay()).map(|v1| (v0, v1)))
             }),
     ).check(|(v0, v1)| v0.abs() <= v1.abs())
 }
@@ -63,7 +62,6 @@ fn f64s_should_partially_order_same_as_source() {
             .filter(|&(v0, v1)| !(v0.is_nan() || v1.is_nan())),
     ).check(|(v0, v1)| v0.abs() <= v1.abs())
 }
-
 
 #[test]
 fn uniform_f64s_should_generate_same_output_given_same_input() {
@@ -279,19 +277,18 @@ fn optional_u64s_should_have_two_regions_for_some() {
     ).check(|(cnt, _)| assert_eq!(2, cnt));
 }
 
-
 #[test]
 fn choice_should_always_draw_from_inputs() {
     let g = optional(u64s());
 
-    property((vecs(u64s()), info_pools(32)).filter(
-        |&(ref its, _)| its.len() > 0,
-    )).check(|(its, p)| {
-        let choice = choice(its.clone()).generate_from(&p).expect(
-            "generate_from",
-        );
-        assert!(its.contains(&choice));
-    });
+    property((vecs(u64s()), info_pools(32)).filter(|&(ref its, _)| its.len() > 0)).check(
+        |(its, p)| {
+            let choice = choice(its.clone())
+                .generate_from(&p)
+                .expect("generate_from");
+            assert!(its.contains(&choice));
+        },
+    );
 }
 
 #[test]

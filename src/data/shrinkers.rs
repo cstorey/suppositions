@@ -75,12 +75,10 @@ impl Iterator for RemovalShrinker {
             candidate.data.extend(&self.seed.data[end..]);
             trace!("removed {},{} -> {:?}", start, end, candidate);
 
-
             return Some(candidate);
         }
     }
 }
-
 
 #[derive(Debug)]
 struct ScalarShrinker {
@@ -218,8 +216,8 @@ mod tests {
     #[test]
     fn minimiser_should_minimise_scalar_values_to_empty() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|_| true))
-            .expect("some smaller pool");
+        let min =
+            minimize(&p, &|t| take_n(t, 16).into_iter().any(|_| true)).expect("some smaller pool");
 
         assert_eq!(min.buffer(), &[] as &[u8])
     }

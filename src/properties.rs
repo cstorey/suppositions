@@ -1,4 +1,3 @@
-
 use std::fmt;
 use std::panic;
 
@@ -113,9 +112,7 @@ where
                 if stats.items_skipped >= self.config.max_skips {
                     panic!(
                         "Could not finish on {}/{} tests (have skipped {} times)",
-                        stats.tests_run,
-                        self.config.num_tests,
-                        stats.items_skipped
+                        stats.tests_run, self.config.num_tests, stats.items_skipped
                     );
                 }
             }
@@ -152,7 +149,6 @@ where
                 res
             )
         }
-
     }
 
     fn attempt<R: CheckResult, F: Fn(G::Item) -> R>(subject: F, arg: G::Item) -> Result<R, String> {

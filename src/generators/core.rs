@@ -204,7 +204,6 @@ pub fn result<G: Generator, H: Generator>(ok: G, err: H) -> ResultGenerator<G, H
     ResultGenerator(ok, err)
 }
 
-
 /// Returns a lazily evaluated generator. The `thunk` should be pure.
 /// Mostly used to allow recursive generators.
 pub fn lazy<F: Fn() -> G, G: Generator>(thunk: F) -> LazyGenerator<F> {
@@ -302,8 +301,6 @@ impl<G: Generator, H: Generator, F: Fn(G::Item) -> H> Generator for FlatMapped<G
     }
 }
 
-
-
 impl<V: Clone> Generator for Const<V> {
     type Item = V;
     fn generate<I: InfoSource>(&self, _: &mut I) -> Maybe<Self::Item> {
@@ -360,7 +357,6 @@ impl<F: Fn() -> G, G: Generator> Generator for LazyGenerator<F> {
         g.generate(src)
     }
 }
-
 
 impl<G: Generator, R: OneOfItem<Item = G::Item>> OneOfItem for OneOfSnoc<G, R> {
     type Item = G::Item;
@@ -433,7 +429,6 @@ pub mod tests {
         InfoPool::of_vec((0..size).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>())
     }
 
-
     pub fn should_generate_same_output_given_same_input<G: Generator>(gen: G)
     where
         G::Item: fmt::Debug + PartialEq,
@@ -442,9 +437,8 @@ pub mod tests {
             .map(|_| gen_random_vec())
             .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
             .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.replay()).and_then(|v0| {
-                    gen.generate(&mut p1.replay()).map(|v1| (p0, p1, v0, v1))
-                })
+                gen.generate(&mut p0.replay())
+                    .and_then(|v0| gen.generate(&mut p1.replay()).map(|v1| (p0, p1, v0, v1)))
             })
             .take(100)
         {
@@ -462,15 +456,13 @@ pub mod tests {
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
             .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.replay()).and_then(|v0| {
-                    gen.generate(&mut p1.replay()).map(|v1| (v0, v1))
-                })
+                gen.generate(&mut p0.replay())
+                    .and_then(|v0| gen.generate(&mut p1.replay()).map(|v1| (v0, v1)))
             })
             .take(nitems)
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .count();
         assert!(differing > 0, "Differing items:{} > 0", differing);
-
     }
 
     // Mostly only useful for scalar quantities. For collections, we basically say:
@@ -500,9 +492,8 @@ pub mod tests {
             .filter(|&(ref v0, ref v1)| v0 < v1)
             .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
             .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.replay()).and_then(|v0| {
-                    gen.generate(&mut p1.replay()).map(|v1| (p0, p1, v0, v1))
-                })
+                gen.generate(&mut p0.replay())
+                    .and_then(|v0| gen.generate(&mut p1.replay()).map(|v1| (p0, p1, v0, v1)))
             })
             .take(nitems)
         {
@@ -565,7 +556,6 @@ pub mod tests {
 
         let val = gen.generate(&mut p.replay()).expect("generated value");
         assert_eq!(val, expected);
-
     }
 
     #[test]
@@ -599,8 +589,6 @@ pub mod tests {
         let gen = optional_by(weighted_coin(3.0f32 / 4.0), u64s());
         should_minimize_to(gen, None);
     }
-
-
 
     #[test]
     fn result_u8_u64s_minimize_to_ok() {
@@ -655,12 +643,10 @@ pub mod tests {
 
     #[test]
     fn filter_map_should_skip_when_err() {
-        let gen = consts(())
-            .filter_map(|()| -> Result<(), DataError> { Err(DataError::SkipItem) });
+        let gen = consts(()).filter_map(|()| -> Result<(), DataError> { Err(DataError::SkipItem) });
         let p = InfoPool::new();
         assert_eq!(gen.generate_from(&p), Err(DataError::SkipItem));
     }
-
 
     #[test]
     fn one_of_should_pick_choices_relativey_evenly() {
@@ -679,7 +665,9 @@ pub mod tests {
 
         println!("Histogram: {:?}", samples);
         assert!(
-            samples.values().all(|&val| val >= (expected - allowed_error) && val <= (expected + allowed_error)),
+            samples
+                .values()
+                .all(|&val| val >= (expected - allowed_error) && val <= (expected + allowed_error)),
             "Sample counts from {} trials are all ({}+/-{}); got {:?}",
             trials,
             expected,

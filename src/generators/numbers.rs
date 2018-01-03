@@ -48,7 +48,6 @@ unsigned_integer_gen!(u32s, u32);
 unsigned_integer_gen!(u64s, u64);
 unsigned_integer_gen!(usizes, usize);
 
-
 pub fn uptos<G: Generator>(g: G, max: G::Item) -> UptoGenerator<G> {
     UptoGenerator(g, max)
 }
@@ -71,7 +70,6 @@ where
         Ok(v.scale(limit.clone()))
     }
 }
-
 
 macro_rules! scale_int_impl {
     ($ty: ident, $next_size: ident) => {
@@ -109,7 +107,7 @@ macro_rules! multiply_limbs_impl {
 
             let (lower, lov) = ll.overflowing_add(lh << half_bits);
             let (lower, lov2) = lower.overflowing_add(hl << half_bits);
-            let upper = hh + 
+            let upper = hh +
                 if lov { 1 } else { 0 } +
                 if lov2 { 1 } else { 0 } +
                 (lh >> half_bits) +
@@ -143,7 +141,6 @@ trait One {
     fn one() -> Self;
 }
 
-
 // We use the equivalent unsigned generator as an intermediate
 macro_rules! signed_integer_gen {
     ($name:ident, $ugen:expr, $ty:ty) => {
@@ -174,7 +171,6 @@ signed_integer_gen!(i16s, u16s(), i16);
 signed_integer_gen!(i32s, u32s(), i32);
 signed_integer_gen!(i64s, u64s(), i64);
 signed_integer_gen!(isizes, usizes(), isize);
-
 
 // As with signed types, use the equivalent unsigned generator as an intermediate
 macro_rules! float_gen {
@@ -281,7 +277,6 @@ mod tests {
         should_generate_same_output_given_same_input((u8s(), u8s()))
     }
 
-
     #[test]
     fn tuple_u8s_u8s_usually_generates_different_output_for_different_inputs() {
         usually_generates_different_output_for_different_inputs((u8s(), u8s()));
@@ -337,7 +332,6 @@ mod tests {
         should_partially_order_same_as_source(uptos(u8s(), 7));
     }
 
-
     multiply_limbs_impl!(mul_u8, u8);
 
     #[test]
@@ -361,10 +355,7 @@ mod tests {
             let res = ((res_h as u16) << 8) | res_l as u16;
             println!(
                 "a:{:#02x} * b:{:#02x} =? {:#04x} (expected {:#04x})",
-                a,
-                b,
-                res,
-                product
+                a, b, res, product
             );
             assert_eq!(res, product)
         });

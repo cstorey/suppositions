@@ -39,12 +39,12 @@
 
 #![warn(missing_docs)]
 
-extern crate rand;
+#[cfg(test)]
+extern crate env_logger;
 extern crate hex_slice;
 #[macro_use]
 extern crate log;
-#[cfg(test)]
-extern crate env_logger;
+extern crate rand;
 
 pub mod data;
 pub mod generators;

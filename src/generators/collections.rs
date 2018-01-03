@@ -58,7 +58,6 @@ where
     }
 }
 
-
 pub fn choice<T>(items: Vec<T>) -> ChoiceGenerator<T> {
     ChoiceGenerator(items)
 }
@@ -122,7 +121,6 @@ impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerat
         Ok(coll)
     }
 }
-
 
 impl<T: Clone> Generator for ChoiceGenerator<T> {
     type Item = T;

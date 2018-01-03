@@ -63,7 +63,6 @@ impl<I> InfoRecorder<I> {
     }
 }
 
-
 impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     fn draw_u8(&mut self) -> u8 {
         let byte = self.inner.borrow_mut().draw_u8();
@@ -115,7 +114,6 @@ pub struct InfoReplay<'a> {
     off: usize,
 }
 
-
 impl fmt::Debug for InfoPool {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("InfoPool")
@@ -133,7 +131,6 @@ pub enum DataError {
     SkipItem,
 }
 
-
 impl InfoPool {
     /// Create an `InfoPool` with a given vector of bytes. (Mostly used for
     /// testing).
@@ -146,7 +143,6 @@ impl InfoPool {
     pub fn new() -> Self {
         Self { data: Vec::new() }
     }
-
 
     /// Allows access to the underlying buffer.
     pub fn buffer(&self) -> &[u8] {
@@ -171,7 +167,6 @@ impl<'a> InfoReplay<'a> {
         res.unwrap_or(0)
     }
 }
-
 
 impl<'a> InfoSource for InfoReplay<'a> {
     fn draw_u8(&mut self) -> u8 {
@@ -260,9 +255,11 @@ mod tests {
 
         let mut p = InfoRecorder::new(RngSource::new());
         let mut v0 = Vec::new();
-        p.draw(FnSink(|src: &mut InfoSource| for _ in 0..4 {
-            let x: u8 = src.draw_u8();
-            v0.push(x);
+        p.draw(FnSink(|src: &mut InfoSource| {
+            for _ in 0..4 {
+                let x: u8 = src.draw_u8();
+                v0.push(x);
+            }
         }));
 
         let p = p.into_pool();
@@ -293,9 +290,11 @@ mod tests {
             v0.push(x);
         }
 
-        p.draw(FnSink(|src: &mut InfoSource| for _ in 0..4 {
-            let x: u8 = src.draw_u8();
-            v0.push(x);
+        p.draw(FnSink(|src: &mut InfoSource| {
+            for _ in 0..4 {
+                let x: u8 = src.draw_u8();
+                v0.push(x);
+            }
         }));
 
         for _ in 0..2 {
@@ -312,7 +311,6 @@ mod tests {
 
         assert_eq!(v0, v1)
     }
-
 
     #[test]
     fn should_allow_borrowing_buffer() {
