@@ -372,3 +372,39 @@ where
         Ok(())
     });
 }
+
+#[test]
+fn flat_map_should_be_associative_over_canary_types() {
+    // I can't think of a better example than this rather contrived thing.
+    flat_map_should_be_associative(
+        &usizes(),
+        &|l| vecs(u8s()).mean_length(l),
+        &|vs| choice(vs),
+    );
+}
+
+fn flat_map_should_be_associative<
+    G: Generator,
+    H: Generator,
+    I: Generator,
+    E: Fn(G::Item) -> H,
+    F: Fn(H::Item) -> I,
+>(
+    gen: &G,
+    e: &E,
+    f: &F,
+) where
+    I::Item: fmt::Debug + PartialEq,
+{
+    // Check that g.map(f).generate(...) == f(g.generate(...))
+    // (return a >>= f)  =-= f a
+    // (Modulo generator failure)
+    property(info_pools(32)).check(|p| -> Result<(), DataError> {
+        let lhs = gen.flat_map(e).flat_map(f);
+        let rhs = gen.flat_map(|x| e(x).flat_map(f));
+
+        assert_eq!(lhs.generate_from(&p), rhs.generate_from(&p));
+
+        Ok(())
+    });
+}
