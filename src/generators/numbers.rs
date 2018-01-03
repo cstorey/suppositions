@@ -16,6 +16,9 @@ pub struct FloatGenerator<N>(PhantomData<N>);
 #[derive(Debug, Clone)]
 pub struct UniformFloatGenerator<N>(PhantomData<N>);
 
+#[derive(Debug, Clone)]
+pub struct RangeGenerator<G: Generator>(G, G::Item);
+
 macro_rules! unsigned_integer_gen {
     ($name:ident, $ty:ty) => {
         /// A generator that generates integers of the specified type.
@@ -44,6 +47,25 @@ unsigned_integer_gen!(u16s, u16);
 unsigned_integer_gen!(u32s, u32);
 unsigned_integer_gen!(u64s, u64);
 unsigned_integer_gen!(usizes, usize);
+
+
+pub fn uptos<G: Generator>(g: G, max: G::Item) -> RangeGenerator<G> {
+    RangeGenerator(g, max)
+}
+
+impl<G: Generator<Item = u8>> Generator for RangeGenerator<G> {
+    type Item = G::Item;
+
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        let &RangeGenerator(ref gen, ref limit) = self;
+
+        let v = gen.generate(src)?;
+
+        let it = (v as u16 * *limit as u16) >> 8;
+
+        Ok(it as u8)
+    }
+}
 
 // We use the equivalent unsigned generator as an intermediate
 macro_rules! signed_integer_gen {
@@ -216,5 +238,25 @@ mod tests {
     #[test]
     fn i64s_should_partially_order_same_as_source() {
         should_partially_order_same_as_source_by(i64s(), |&v| v.abs());
+    }
+
+    #[test]
+    fn upto_u8s_should_generate_same_output_given_same_input() {
+        should_generate_same_output_given_same_input(uptos(u8s(), 7))
+    }
+
+    #[test]
+    fn upto_u8s_usually_generates_different_output_for_different_inputs() {
+        usually_generates_different_output_for_different_inputs(uptos(u8s(), 7));
+    }
+
+    #[test]
+    fn upto_u8s_minimize_to_minimum_value() {
+        should_minimize_to(uptos(u8s(), 7), 0)
+    }
+
+    #[test]
+    fn upto_u8s_should_partially_order_same_as_source() {
+        should_partially_order_same_as_source(uptos(u8s(), 7));
     }
 }

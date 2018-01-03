@@ -190,6 +190,14 @@ fn lazy_generator_yields_same_as_inner_value() {
     })).check(|(v0, v1)| v0 == v1)
 }
 
+#[test]
+fn uptos_never_generates_greater_than_limit() {
+    env_logger::init().unwrap_or(());
+    property(u8s().flat_map(
+        |max| uptos(u8s(), max).map(move |n| (n, max)),
+    )).check(|(n, max)| n <= max);
+}
+
 struct RegionCounter<S> {
     src: S,
     cnt: usize,
