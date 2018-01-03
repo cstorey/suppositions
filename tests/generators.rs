@@ -5,6 +5,7 @@ extern crate env_logger;
 use suppositions::*;
 use suppositions::generators::*;
 use suppositions::data::*;
+use std::fmt;
 
 fn _assert_is_generator<G: Generator>(_: &G) {}
 
@@ -239,4 +240,78 @@ fn optional_u64s_should_have_two_regions_for_some() {
             })
             .filter(|&(_, ref val)| val.is_some()),
     ).check(|(cnt, _)| assert_eq!(2, cnt));
+}
+
+#[test]
+fn map_should_yield_generated_value_but_with_f_applied_for_usize() {
+    fn add_one(i: usize) -> usize {
+        i.wrapping_add(i)
+    }
+    let f = add_one;
+    let g = usizes();
+    map_should_yield_generated_value_but_with_f_applied(&g, &f);
+}
+
+fn map_should_yield_generated_value_but_with_f_applied<
+    G: Generator,
+    R: fmt::Debug + PartialEq,
+    F: Fn(G::Item) -> R,
+>(
+    g: &G,
+    f: &F,
+) {
+    // Check that g.map(f).generate(...) == f(g.generate(...))
+    // (Modulo generator failure)
+    property(info_pools(32)).check(move |p| {
+        assert_eq!(
+            g.generate_from(&p).map(f),
+            g.clone().map(f).generate_from(&p)
+        )
+    });
+}
+
+// These are inspired by https://hackage.haskell.org/package/checkers-0.4.9.5/docs/src/Test-QuickCheck-Classes.html#monad
+
+#[test]
+fn flat_map_should_have_left_identity_over_usize() {
+    let f = |i: usize| consts(i.wrapping_add(1));
+    let gen = usizes();
+    flat_map_should_have_left_identity(&gen, &f);
+}
+
+fn flat_map_should_have_left_identity<G: Generator, H: Generator, F: Fn(G::Item) -> H>(g: &G, f: &F)
+where
+    G::Item: fmt::Debug + Clone,
+    H::Item: fmt::Debug + PartialEq,
+{
+    property(info_pools(32).filter_map(|p| {
+        let a = g.generate_from(&p)?;
+        Ok((p, a))
+    })).check(|(p, a)| -> Result<(), DataError> {
+        let lhs = consts(a.clone()).flat_map(f);
+        let rhs = f(a);
+
+        assert_eq!(lhs.generate_from(&p), rhs.generate_from(&p));
+
+        Ok(())
+    });
+}
+
+#[test]
+fn flat_map_should_have_right_identity_over_usize() {
+    flat_map_should_have_right_identity(&usizes());
+}
+
+fn flat_map_should_have_right_identity<G: Generator>(g: &G)
+where
+    G::Item: fmt::Debug + PartialEq + Clone,
+{
+    property(info_pools(32)).check(|p| -> Result<(), DataError> {
+        let lhs = g.clone().flat_map(consts);
+        let rhs = g;
+
+        assert_eq!(lhs.generate_from(&p), rhs.generate_from(&p));
+
+        Ok(())
+    });
 }

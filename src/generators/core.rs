@@ -62,6 +62,9 @@ pub struct FilterMapped<G, F>(G, F);
 /// See [`Generator::map`](trait.Generator.html#method.map)
 #[derive(Debug, Clone)]
 pub struct Mapped<G, F>(G, F);
+/// See [`Generator::flat_map`](trait.Generator.html#method.flat_map)
+#[derive(Debug, Clone)]
+pub struct FlatMapped<G, F>(G, F);
 /// See [`consts`](fn.consts.html)
 #[derive(Debug, Clone)]
 pub struct Const<V>(V);
@@ -109,6 +112,13 @@ pub trait Generator {
         Self: Sized,
     {
         Mapped(self, fun)
+    }
+
+    fn flat_map<H: Generator, F: Fn(Self::Item) -> H>(self, fun: F) -> FlatMapped<Self, F>
+    where
+        Self: Sized,
+    {
+        FlatMapped(self, fun)
     }
 }
 
@@ -281,6 +291,18 @@ impl<G: Generator, R, F: Fn(G::Item) -> R> Generator for Mapped<G, F> {
         Ok(out)
     }
 }
+
+impl<G: Generator, H: Generator, F: Fn(G::Item) -> H> Generator for FlatMapped<G, F> {
+    type Item = H::Item;
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        let &FlatMapped(ref gen, ref f) = self;
+        let gen2 = gen.generate(src)?;
+        let out = f(gen2).generate(src)?;
+        Ok(out)
+    }
+}
+
+
 
 impl<V: Clone> Generator for Const<V> {
     type Item = V;
