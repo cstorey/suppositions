@@ -190,15 +190,16 @@ fn lazy_generator_yields_same_as_inner_value() {
     })).check(|(v0, v1)| v0 == v1)
 }
 
-fn uptos_never_generates_greater_than_limit<G: Generator + Clone>(g: G) where G::Item: ScaleInt + Copy + fmt::Debug + PartialOrd {
+fn uptos_never_generates_greater_than_limit<G: Generator + Clone>(g: G)
+where
+    G::Item: ScaleInt + Copy + fmt::Debug + PartialOrd,
+{
     env_logger::init().unwrap_or(());
-    property(g.clone().flat_map(
-        |max| {
-            let h = uptos(g.clone(), max);
-            _assert_is_generator(&h);
-            h.map(move |n| (n, max))
-        },
-    )).check(|(n, max)| n <= max);
+    property(g.clone().flat_map(|max| {
+        let h = uptos(g.clone(), max);
+        _assert_is_generator(&h);
+        h.map(move |n| (n, max))
+    })).check(|(n, max)| n <= max);
 }
 
 #[test]
@@ -276,6 +277,29 @@ fn optional_u64s_should_have_two_regions_for_some() {
             })
             .filter(|&(_, ref val)| val.is_some()),
     ).check(|(cnt, _)| assert_eq!(2, cnt));
+}
+
+
+#[test]
+fn choice_should_always_draw_from_inputs() {
+    let g = optional(u64s());
+
+    property((vecs(u64s()), info_pools(32)).filter(
+        |&(ref its, _)| its.len() > 0,
+    )).check(|(its, p)| {
+        let choice = choice(its.clone()).generate_from(&p).expect(
+            "generate_from",
+        );
+        assert!(its.contains(&choice));
+    });
+}
+
+#[test]
+fn choice_should_skip_on_empty_choices() {
+    property(info_pools(32)).check(|p| {
+        let result = choice(vec![0u8; 0]).generate_from(&p);
+        assert_eq!(result, Err(DataError::SkipItem));
+    });
 }
 
 #[test]

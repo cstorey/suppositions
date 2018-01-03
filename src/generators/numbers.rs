@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 use std::mem::size_of;
-use std::ops;
 use data::*;
 
 use super::core::*;
@@ -58,7 +57,10 @@ pub trait ScaleInt {
     fn scale(self, max: Self) -> Self;
 }
 
-impl<G: Generator> Generator for UptoGenerator<G> where G::Item: ScaleInt + Copy {
+impl<G: Generator> Generator for UptoGenerator<G>
+where
+    G::Item: ScaleInt + Copy,
+{
     type Item = G::Item;
 
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
@@ -125,8 +127,15 @@ scale_int_impl!(u32, u64);
 impl ScaleInt for u64 {
     fn scale(self, max: Self) -> Self {
         multiply_limbs_impl!(mul_u64s, u64);
-        let (h, l) = mul_u64s(self, max);
+        let (h, _) = mul_u64s(self, max);
         h
+    }
+}
+
+impl ScaleInt for usize {
+    fn scale(self, max: Self) -> Self {
+        assert_eq!(::std::mem::size_of::<usize>(), ::std::mem::size_of::<u64>());
+        u64::scale(self as u64, max as u64) as usize
     }
 }
 
@@ -333,24 +342,30 @@ mod tests {
 
     #[test]
     fn multiply_with_carries_works() {
-        let a = 123; 
+        let a = 123;
         let b = 113;
         // 123 * 113 = 13899 or 0x364b
         let expected = (0x36, 0x4b);
 
-        assert_eq!(mul_u8(a,b), expected);
+        assert_eq!(mul_u8(a, b), expected);
     }
 
     #[test]
     fn prop_multiply_with_carries_works() {
         use ::*;
-        use ::generators::*;
+        use generators::*;
 
         property((u8s(), u8s())).check(|(a, b)| {
             let product = (a as u16) * (b as u16);
             let (res_h, res_l) = mul_u8(a, b);
             let res = ((res_h as u16) << 8) | res_l as u16;
-            println!("a:{:#02x} * b:{:#02x} =? {:#04x} (expected {:#04x})", a, b, res, product);
+            println!(
+                "a:{:#02x} * b:{:#02x} =? {:#04x} (expected {:#04x})",
+                a,
+                b,
+                res,
+                product
+            );
             assert_eq!(res, product)
         });
     }

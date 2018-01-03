@@ -22,6 +22,9 @@ pub struct CollectionGenerator<C, G> {
     mean_length: usize,
 }
 
+#[derive(Debug, Clone)]
+pub struct ChoiceGenerator<T>(Vec<T>);
+
 /// Generates vectors with items given by `inner`.
 pub fn vecs<G>(inner: G) -> VecGenerator<G> {
     VecGenerator {
@@ -53,6 +56,11 @@ where
         inner: item,
         mean_length: 16,
     }
+}
+
+
+pub fn choice<T>(items: Vec<T>) -> ChoiceGenerator<T> {
+    ChoiceGenerator(items)
 }
 
 impl<G> VecGenerator<G> {
@@ -112,6 +120,26 @@ impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerat
 
         trace!("<- CollectionGenerator::generate");
         Ok(coll)
+    }
+}
+
+
+impl<T: Clone> Generator for ChoiceGenerator<T> {
+    type Item = T;
+
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        let &ChoiceGenerator(ref options) = self;
+        if options.len() == 0 {
+            warn!("Empty instance of ChoiceGenerator");
+            return Err(DataError::SkipItem);
+        }
+        trace!("-> ChoiceGenerator::generate");
+        let range_gen = uptos(usizes(), options.len());
+        let off = src.draw(&range_gen)?;
+
+        let res = options[off].clone();
+        trace!("<- ChoiceGenerator::generate");
+        Ok(res)
     }
 }
 
@@ -236,8 +264,6 @@ mod tests {
             );
         }
     }
-
-
 
     mod vector_lengths {
         use env_logger;
