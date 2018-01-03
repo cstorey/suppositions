@@ -218,7 +218,7 @@ impl Generator for BoolGenerator {
     }
 }
 
-impl<B: Generator<Item=bool>, G: Generator> Generator for OptionalGenerator<B, G> {
+impl<B: Generator<Item = bool>, G: Generator> Generator for OptionalGenerator<B, G> {
     type Item = Option<G::Item>;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         trace!("-> OptionalGenerator::generate");
@@ -574,9 +574,7 @@ pub mod tests {
 
     #[test]
     fn optional_by_coin_of_u64s_minimize_to_none() {
-        let gen = optional_by(
-                weighted_coin(3.0f32/4.0),
-                u64s());
+        let gen = optional_by(weighted_coin(3.0f32 / 4.0), u64s());
         should_minimize_to(gen, None);
     }
 

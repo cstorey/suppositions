@@ -81,14 +81,21 @@ where
     pub fn check<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(self, subject: F) {
         let mut stats = Stats::default();
         while stats.tests_run < self.config.num_tests {
-            trace!("Tests run: {}; skipped:{}", stats.tests_run, stats.items_skipped);
+            trace!(
+                "Tests run: {}; skipped:{}",
+                stats.tests_run,
+                stats.items_skipped
+            );
             self.try_one(&mut stats, &subject)
         }
         trace!("Completing okay");
     }
 
     fn try_one<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(
-            &self, stats: &mut Stats, subject: &F) {
+        &self,
+        stats: &mut Stats,
+        subject: &F,
+    ) {
         let mut src = RngSource::new();
         let mut pool = InfoRecorder::new(&mut src);
         let result = self.gen.generate(&mut pool);
@@ -118,7 +125,12 @@ where
         }
     }
 
-    fn try_example<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(&self, subject: &F, pool: InfoPool, arg: G::Item) {
+    fn try_example<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(
+        &self,
+        subject: &F,
+        pool: InfoPool,
+        arg: G::Item,
+    ) {
         let res = Self::attempt(&subject, arg);
         trace!(
             "Result: {:?} -> {:?}",
@@ -126,16 +138,12 @@ where
             res
         );
         if res.is_failure() {
-            let minpool = find_minimal(
-                &self.gen,
-                pool,
-                |v| {
-                    trace!("Shrink attempt: {:?}", v);
-                    let res = Self::attempt(&subject, v);
-                    trace!("Shrink attempt -> {:?}", res);
-                    res.is_failure()
-                    },
-            );
+            let minpool = find_minimal(&self.gen, pool, |v| {
+                trace!("Shrink attempt: {:?}", v);
+                let res = Self::attempt(&subject, v);
+                trace!("Shrink attempt -> {:?}", res);
+                res.is_failure()
+            });
             trace!("Minpool: {:?}", minpool);
             trace!("Values: {:?}", self.gen.generate(&mut minpool.replay()));
             panic!(

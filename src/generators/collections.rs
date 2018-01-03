@@ -151,8 +151,9 @@ mod tests {
             self.inner.draw_u8()
         }
         fn draw<S: InfoSink>(&mut self, sink: S) -> S::Out
-            where
-            Self: Sized {
+        where
+            Self: Sized,
+        {
             trace!("-> Tracer::draw");
             self.child_draws += 1;
             let res = self.inner.draw(sink);
@@ -171,8 +172,12 @@ mod tests {
             let mut rec = Tracer::new(&mut src);
             let val = gen.generate(&mut rec).expect("generate");
 
-            assert!(rec.child_draws == val.len() + 1,
-                    "child_draws:{} == val.len:{}", rec.child_draws, val.len());
+            assert!(
+                rec.child_draws == val.len() + 1,
+                "child_draws:{} == val.len:{}",
+                rec.child_draws,
+                val.len()
+            );
         }
     }
 
@@ -223,8 +228,12 @@ mod tests {
             let mut rec = Tracer::new(&mut src);
             let val = gen.generate(&mut rec).expect("generate");
 
-            assert!(rec.child_draws == val.len() + 1,
-                    "child_draws:{} == val.len:{}", rec.child_draws, val.len());
+            assert!(
+                rec.child_draws == val.len() + 1,
+                "child_draws:{} == val.len:{}",
+                rec.child_draws,
+                val.len()
+            );
         }
     }
 
