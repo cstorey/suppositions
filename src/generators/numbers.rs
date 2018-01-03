@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::ops;
 use data::*;
 
 use super::core::*;
@@ -17,7 +18,7 @@ pub struct FloatGenerator<N>(PhantomData<N>);
 pub struct UniformFloatGenerator<N>(PhantomData<N>);
 
 #[derive(Debug, Clone)]
-pub struct RangeGenerator<G: Generator>(G, G::Item);
+pub struct UptoGenerator<G: Generator>(G, G::Item);
 
 macro_rules! unsigned_integer_gen {
     ($name:ident, $ty:ty) => {
@@ -49,23 +50,90 @@ unsigned_integer_gen!(u64s, u64);
 unsigned_integer_gen!(usizes, usize);
 
 
-pub fn uptos<G: Generator>(g: G, max: G::Item) -> RangeGenerator<G> {
-    RangeGenerator(g, max)
+pub fn uptos<G: Generator>(g: G, max: G::Item) -> UptoGenerator<G> {
+    UptoGenerator(g, max)
 }
 
-impl<G: Generator<Item = u8>> Generator for RangeGenerator<G> {
+pub trait ScaleInt {
+    fn scale(self, max: Self) -> Self;
+}
+
+impl<G: Generator> Generator for UptoGenerator<G> where G::Item: ScaleInt + Copy {
     type Item = G::Item;
 
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        let &RangeGenerator(ref gen, ref limit) = self;
+        let &UptoGenerator(ref gen, ref limit) = self;
 
         let v = gen.generate(src)?;
 
-        let it = (v as u16 * *limit as u16) >> 8;
-
-        Ok(it as u8)
+        Ok(v.scale(limit.clone()))
     }
 }
+
+
+macro_rules! scale_int_impl {
+    ($ty: ident, $next_size: ident) => {
+        impl ScaleInt for $ty {
+            fn scale(self, max: Self) -> Self {
+                let shift = ::std::mem::size_of::<$ty>() * 8;
+                let res = (self as $next_size * max as $next_size) >> shift;
+                res as Self
+            }
+        }
+    }
+}
+
+// this is a macro because:
+// * I wnat to be able to test that this is correct against smaller than u64 values, and
+// * rust std numerics aren't so useful for doing that generically.
+macro_rules! multiply_limbs_impl {
+    ($name: ident, $ty: ident) => {
+        fn $name(a: $ty, b: $ty) -> ($ty, $ty) {
+            let shift_bits = ::std::mem::size_of::<$ty>() * 8;
+            let half_bits = shift_bits / 2;
+            let mask = (1 << half_bits) - 1;
+
+            let al = a & mask;
+            let ah = a >> half_bits;
+            let bl = b & mask;
+            let bh = b >> half_bits;
+
+            let ll = al * bl;
+            let lh = al * bh;
+            let hl = ah * bl;
+            let hh = ah * bh;
+
+            // println!("{:#02x} * {:#02x}; [[{:#02x}, {:#02x}], [{:#02x}, {:#02x}]]", a, b, hh, hl, lh, ll);
+
+            let (lower, lov) = ll.overflowing_add(lh << half_bits);
+            let (lower, lov2) = lower.overflowing_add(hl << half_bits);
+            let upper = hh + 
+                if lov { 1 } else { 0 } +
+                if lov2 { 1 } else { 0 } +
+                (lh >> half_bits) +
+                (hl >> half_bits);
+
+            (upper, lower)
+        }
+    }
+}
+
+scale_int_impl!(u8, u16);
+scale_int_impl!(u16, u32);
+scale_int_impl!(u32, u64);
+
+impl ScaleInt for u64 {
+    fn scale(self, max: Self) -> Self {
+        multiply_limbs_impl!(mul_u64s, u64);
+        let (h, l) = mul_u64s(self, max);
+        h
+    }
+}
+
+trait One {
+    fn one() -> Self;
+}
+
 
 // We use the equivalent unsigned generator as an intermediate
 macro_rules! signed_integer_gen {
@@ -258,5 +326,32 @@ mod tests {
     #[test]
     fn upto_u8s_should_partially_order_same_as_source() {
         should_partially_order_same_as_source(uptos(u8s(), 7));
+    }
+
+
+    multiply_limbs_impl!(mul_u8, u8);
+
+    #[test]
+    fn multiply_with_carries_works() {
+        let a = 123; 
+        let b = 113;
+        // 123 * 113 = 13899 or 0x364b
+        let expected = (0x36, 0x4b);
+
+        assert_eq!(mul_u8(a,b), expected);
+    }
+
+    #[test]
+    fn prop_multiply_with_carries_works() {
+        use ::*;
+        use ::generators::*;
+
+        property((u8s(), u8s())).check(|(a, b)| {
+            let product = (a as u16) * (b as u16);
+            let (res_h, res_l) = mul_u8(a, b);
+            let res = ((res_h as u16) << 8) | res_l as u16;
+            println!("a:{:#02x} * b:{:#02x} =? {:#04x} (expected {:#04x})", a, b, res, product);
+            assert_eq!(res, product)
+        });
     }
 }

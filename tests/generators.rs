@@ -190,12 +190,40 @@ fn lazy_generator_yields_same_as_inner_value() {
     })).check(|(v0, v1)| v0 == v1)
 }
 
-#[test]
-fn uptos_never_generates_greater_than_limit() {
+fn uptos_never_generates_greater_than_limit<G: Generator + Clone>(g: G) where G::Item: ScaleInt + Copy + fmt::Debug + PartialOrd {
     env_logger::init().unwrap_or(());
-    property(u8s().flat_map(
-        |max| uptos(u8s(), max).map(move |n| (n, max)),
+    property(g.clone().flat_map(
+        |max| {
+            let h = uptos(g.clone(), max);
+            _assert_is_generator(&h);
+            h.map(move |n| (n, max))
+        },
     )).check(|(n, max)| n <= max);
+}
+
+#[test]
+fn uptos_u8_is_gen() {
+    _assert_is_generator(&uptos(u8s(), ::std::u8::MAX))
+}
+
+#[test]
+fn uptos_u8_never_generates_greater_than_limit() {
+    uptos_never_generates_greater_than_limit(u8s())
+}
+
+#[test]
+fn uptos_u16_never_generates_greater_than_limit() {
+    uptos_never_generates_greater_than_limit(u16s())
+}
+
+#[test]
+fn uptos_u32_never_generates_greater_than_limit() {
+    uptos_never_generates_greater_than_limit(u32s())
+}
+
+#[test]
+fn uptos_u64_never_generates_greater_than_limit() {
+    uptos_never_generates_greater_than_limit(u64s())
 }
 
 struct RegionCounter<S> {
