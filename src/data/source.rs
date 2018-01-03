@@ -162,9 +162,12 @@ impl<'a> InfoReplay<'a> {
     /// Consumes the next byte from this tap. Returns `Ok(x)` if successful,
     /// or `Err(DataError::PoolExhausted)` if we have reached the end.
     pub fn next_byte(&mut self) -> u8 {
-        let res = self.data.get(self.off).cloned();
-        self.off += 1;
-        res.unwrap_or(0)
+        if let Some(res) = self.data.get(self.off).cloned() {
+            self.off += 1;
+            res
+        } else {
+            0
+        }
     }
 }
 
