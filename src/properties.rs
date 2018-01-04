@@ -97,7 +97,7 @@ where
     ) {
         let mut src = RngSource::new();
         let mut pool = InfoRecorder::new(&mut src);
-        let result = self.gen.generate(&mut pool);
+        let result = pool.draw(&self.gen);
         trace!("Pool: {:?}", pool);
         let pool = pool.into_pool();
         match result {
@@ -131,7 +131,7 @@ where
         let res = Self::attempt(&subject, arg);
         trace!(
             "Result: {:?} -> {:?}",
-            self.gen.generate(&mut pool.replay()),
+            pool.replay().draw(&self.gen),
             res
         );
         if res.is_failure() {
@@ -142,10 +142,10 @@ where
                 res.is_failure()
             });
             trace!("Minpool: {:?}", minpool);
-            trace!("Values: {:?}", self.gen.generate(&mut minpool.replay()));
+            trace!("Values: {:?}", minpool.replay().draw(&self.gen));
             panic!(
                 "Predicate failed for argument {:?}; check returned {:?}",
-                self.gen.generate(&mut minpool.replay()),
+                minpool.replay().draw(&self.gen),
                 res
             )
         }

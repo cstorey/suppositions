@@ -74,9 +74,12 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     where
         Self: Sized,
     {
-        trace!("-> InfoSource::draw");
+        let start = self.data.len();
+        debug!("-> InfoRecorder::draw @{}", start);
         let res = sink.sink(self);
-        trace!("<- InfoSource::draw");
+        let end = self.data.len();
+        debug!("<- InfoRecorder::draw @{}", end);
+        debug!("Span: {:?}", (start, end));
         res
     }
 }

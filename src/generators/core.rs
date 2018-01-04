@@ -220,9 +220,9 @@ impl<'a, G: Generator> Generator for &'a G {
 impl Generator for BoolGenerator {
     type Item = bool;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        trace!("-> BoolGenerator::generate");
+        debug!("-> BoolGenerator::generate");
         let res = src.draw_u8() >= 0x80;
-        trace!("<- BoolGenerator::generate");
+        debug!("<- BoolGenerator::generate");
         Ok(res)
     }
 }
@@ -230,7 +230,7 @@ impl Generator for BoolGenerator {
 impl<B: Generator<Item = bool>, G: Generator> Generator for OptionalGenerator<B, G> {
     type Item = Option<G::Item>;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        trace!("-> OptionalGenerator::generate");
+        debug!("-> OptionalGenerator::generate");
         let &OptionalGenerator(ref bools, ref gen) = self;
         let result = if src.draw(bools)? {
             Some(src.draw(gen)?)
@@ -238,7 +238,7 @@ impl<B: Generator<Item = bool>, G: Generator> Generator for OptionalGenerator<B,
             None
         };
 
-        trace!("<- OptionalGenerator::generate");
+        debug!("<- OptionalGenerator::generate");
         Ok(result)
     }
 }
@@ -311,11 +311,11 @@ impl<V: Clone> Generator for Const<V> {
 impl Generator for WeightedCoinGenerator {
     type Item = bool;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        trace!("-> WeightedCoinGenerator::generate");
+        debug!("-> WeightedCoinGenerator::generate");
         let &WeightedCoinGenerator(p) = self;
         let v = uniform_f32s().generate(src)?;
         let res = v > (1.0 - p);
-        trace!("<- WeightedCoinGenerator::generate");
+        debug!("<- WeightedCoinGenerator::generate");
         Ok(res)
     }
 }
@@ -401,7 +401,7 @@ pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(
     check: F,
 ) -> InfoPool {
     minimize(&pool, &|mut t| {
-        gen.generate(&mut t).map(|v| check(v)).unwrap_or(false)
+        t.draw(&gen).map(|v| check(v)).unwrap_or(false)
     }).unwrap_or(pool)
 }
 

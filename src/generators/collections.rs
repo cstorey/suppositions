@@ -75,11 +75,13 @@ impl<G: Generator> Generator for VecGenerator<G> {
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let mut result = Vec::new();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
+        debug!("-> VecGenerator::generate");
         let opts = optional_by(weighted_coin(1.0 - p_is_final), &self.inner);
         while let Some(item) = src.draw(&opts)? {
             result.push(item)
         }
 
+        debug!("<- VecGenerator::generate");
         Ok(result)
     }
 }
@@ -109,7 +111,7 @@ impl<G, C> CollectionGenerator<C, G> {
 impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerator<C, G> {
     type Item = C;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        trace!("-> CollectionGenerator::generate");
+        debug!("-> CollectionGenerator::generate");
         let mut coll: C = Default::default();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
         let opts = optional_by(weighted_coin(1.0 - p_is_final), &self.inner);
@@ -117,7 +119,7 @@ impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerat
             coll.extend(iter::once(item));
         }
 
-        trace!("<- CollectionGenerator::generate");
+        debug!("<- CollectionGenerator::generate");
         Ok(coll)
     }
 }
@@ -131,12 +133,24 @@ impl<T: Clone> Generator for ChoiceGenerator<T> {
             warn!("Empty instance of ChoiceGenerator");
             return Err(DataError::SkipItem);
         }
-        trace!("-> ChoiceGenerator::generate");
-        let range_gen = uptos(usizes(), options.len());
-        let off = src.draw(&range_gen)?;
+
+        debug_assert!(options.len() <= u32::max_value() as usize);
+
+        debug!("-> ChoiceGenerator::generate");
+        // Slow as ... a very slow thing, and result in a non-optimal shrink.
+        let off = src.draw(&uptos(usizes(), options.len()))?;
+        // these are both very fast.
+        // let off = src.draw(&uptos(u32s(), options.len() as u32))? as usize;
+        // let off = src.draw(&uptos(u32s().map(|n| (n as usize) << 32), options.len()))?;
+
+        // let v = !u32s().generate(src)?;
+        // let off = (v as usize * self.0.len()) >> 32;
+
+        // let v = !src.draw(&u32s())?;
+        // let off = (v as usize * options.len()) >> 32;
 
         let res = options[off].clone();
-        trace!("<- ChoiceGenerator::generate");
+        debug!("<- ChoiceGenerator::generate");
         Ok(res)
     }
 }
@@ -180,10 +194,10 @@ mod tests {
         where
             Self: Sized,
         {
-            trace!("-> Tracer::draw");
+            debug!("-> Tracer::draw");
             self.child_draws += 1;
             let res = self.inner.draw(sink);
-            trace!("<- Tracer::draw");
+            debug!("<- Tracer::draw");
             res
         }
     }
