@@ -22,6 +22,7 @@ pub struct CollectionGenerator<C, G> {
     mean_length: usize,
 }
 
+/// See [`choice`](fn.choice.html)
 #[derive(Debug, Clone)]
 pub struct ChoiceGenerator<T>(Vec<T>);
 
@@ -58,6 +59,7 @@ where
     }
 }
 
+/// Returns a random item from the array.
 pub fn choice<T>(items: Vec<T>) -> ChoiceGenerator<T> {
     ChoiceGenerator(items)
 }

@@ -114,6 +114,8 @@ pub trait Generator {
         Mapped(self, fun)
     }
 
+    /// A generator that allows creating a new generator based on the results
+    /// of a previous generator.
     fn flat_map<H: Generator, F: Fn(Self::Item) -> H>(self, fun: F) -> FlatMapped<Self, F>
     where
         Self: Sized,

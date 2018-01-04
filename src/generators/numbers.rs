@@ -16,6 +16,7 @@ pub struct FloatGenerator<N>(PhantomData<N>);
 #[derive(Debug, Clone)]
 pub struct UniformFloatGenerator<N>(PhantomData<N>);
 
+/// See [`uptos`](fn.uptos.html)
 #[derive(Debug, Clone)]
 pub struct UptoGenerator<G: Generator>(G, G::Item);
 
@@ -48,10 +49,12 @@ unsigned_integer_gen!(u32s, u32);
 unsigned_integer_gen!(u64s, u64);
 unsigned_integer_gen!(usizes, usize);
 
+/// Scales the output of g generating an unsigned integer upto max.
 pub fn uptos<G: Generator>(g: G, max: G::Item) -> UptoGenerator<G> {
     UptoGenerator(g, max)
 }
 
+#[doc(hidden)]
 pub trait ScaleInt {
     fn scale(self, max: Self) -> Self;
 }

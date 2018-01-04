@@ -37,6 +37,7 @@
 
 //! Another common example is to verify that values can be round-tripped through a serialisation mechanism.
 
+#![deny(warnings)]
 #![warn(missing_docs)]
 
 #[cfg(test)]

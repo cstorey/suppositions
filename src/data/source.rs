@@ -1,8 +1,6 @@
 use std::fmt;
 use hex_slice::AsHex;
 use rand::{random, Rng, XorShiftRng};
-use std::rc::Rc;
-use std::cell::RefCell;
 
 /// Something that can extract information from an `InfoSource`.
 pub trait InfoSink {

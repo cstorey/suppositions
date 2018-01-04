@@ -158,8 +158,7 @@ pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(p: &InfoPool, pred: &F)
 
     debug!("Shrinking pool");
     let mut matching_shrinks = shrunk_pools.filter(|c| {
-        let mut src = c.replay();
-        let mut pool = InfoRecorder::new(src);
+        let pool = InfoRecorder::new(c.replay());
         let test = pred(pool);
         trace!("test result: {:?} <= {:?}", test, c);
         test

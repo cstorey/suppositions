@@ -279,8 +279,6 @@ fn optional_u64s_should_have_two_regions_for_some() {
 
 #[test]
 fn choice_should_always_draw_from_inputs() {
-    let g = optional(u64s());
-
     property((vecs(u64s()), info_pools(32)).filter(|&(ref its, _)| its.len() > 0)).check(
         |(its, p)| {
             let choice = choice(its.clone())
