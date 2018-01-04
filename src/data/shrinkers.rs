@@ -73,7 +73,8 @@ impl Iterator for RemovalShrinker {
             candidate.data.clear();
             candidate.data.extend(&self.seed.data[0..start]);
             candidate.data.extend(&self.seed.data[end..]);
-            trace!("removed {},{} -> {:?}", start, end, candidate);
+            debug!("removed {},{}", start, end);
+            trace!("candidate {:?}", candidate);
 
             return Some(candidate);
         }
@@ -119,14 +120,11 @@ impl Iterator for ScalarShrinker {
 
             if orig_val != new_val {
                 candidate.data[pos] = new_val;
-                trace!(
-                    "shrunk item -(bitoff:{}) {} {}->{}: {:?}",
-                    bitoff,
-                    pos,
-                    orig_val,
-                    new_val,
-                    candidate
+                debug!(
+                    "shrunk item -(bitoff:{}) {} {}->{}",
+                    bitoff, pos, orig_val, new_val
                 );
+                trace!("candidate {:?}", candidate);
 
                 return Some(candidate);
             }
@@ -157,6 +155,8 @@ impl Iterator for ScalarShrinker {
 /// seven eighths, and so on.
 pub fn minimize<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
     let shrunk_pools = RemovalShrinker::new(p.clone()).chain(ScalarShrinker::new(p.clone()));
+
+    debug!("Shrinking pool");
     let mut matching_shrinks = shrunk_pools.filter(|c| {
         let test = pred(c.replay());
         trace!("test result: {:?} <= {:?}", test, c);
@@ -164,10 +164,14 @@ pub fn minimize<F: Fn(InfoReplay) -> bool>(p: &InfoPool, pred: &F) -> Option<Inf
     });
 
     if let Some(candidate) = matching_shrinks.next() {
-        trace!("Re-Shrinking: {:?}", candidate);
-        Some(minimize(&candidate, pred).unwrap_or(candidate))
+        debug!("Re-Shrinking");
+        trace!("candidate {:?}", candidate);
+        let result = minimize(&candidate, pred).unwrap_or(candidate);
+        debug!("Re-Shrinking done");
+        Some(result)
     } else {
-        trace!("Nothing smaller found than {:?}", p);
+        debug!("Nothing smaller found");
+        trace!("... than {:?}", p);
         None
     }
 }

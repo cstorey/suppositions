@@ -376,11 +376,7 @@ where
 #[test]
 fn flat_map_should_be_associative_over_canary_types() {
     // I can't think of a better example than this rather contrived thing.
-    flat_map_should_be_associative(
-        &usizes(),
-        &|l| vecs(u8s()).mean_length(l),
-        &|vs| choice(vs),
-    );
+    flat_map_should_be_associative(&usizes(), &|l| vecs(u8s()).mean_length(l), &|vs| choice(vs));
 }
 
 fn flat_map_should_be_associative<
