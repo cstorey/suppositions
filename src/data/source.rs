@@ -32,7 +32,7 @@ pub struct RngSource<R> {
 /// An adapter that can record the data drawn from an underlying source.
 #[derive(Debug)]
 pub struct InfoRecorder<I> {
-    inner: Rc<RefCell<I>>,
+    inner: I,
     pub(crate) data: Vec<u8>,
 }
 
@@ -52,7 +52,7 @@ impl<I> InfoRecorder<I> {
     /// Creates a recording InfoSource.
     pub fn new(inner: I) -> Self {
         InfoRecorder {
-            inner: Rc::new(RefCell::new(inner)),
+            inner: inner,
             data: Vec::new(),
         }
     }
@@ -65,7 +65,7 @@ impl<I> InfoRecorder<I> {
 
 impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     fn draw_u8(&mut self) -> u8 {
-        let byte = self.inner.borrow_mut().draw_u8();
+        let byte = self.inner.draw_u8();
         self.data.push(byte);
         byte
     }
