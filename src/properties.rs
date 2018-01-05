@@ -129,11 +129,7 @@ where
         arg: G::Item,
     ) {
         let res = Self::attempt(&subject, arg);
-        trace!(
-            "Result: {:?} -> {:?}",
-            pool.replay().draw(&self.gen),
-            res
-        );
+        trace!("Result: {:?} -> {:?}", pool.replay().draw(&self.gen), res);
         if res.is_failure() {
             let minpool = find_minimal(&self.gen, pool, |v| {
                 trace!("Shrink attempt: {:?}", v);

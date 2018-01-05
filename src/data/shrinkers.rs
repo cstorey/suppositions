@@ -153,7 +153,10 @@ impl Iterator for ScalarShrinker {
 /// Reducing individual values basically goes through each position in the
 /// pool, and then tries reducing it to zero, then half, thn three quarters,
 /// seven eighths, and so on.
-pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(p: &InfoPool, pred: &F) -> Option<InfoPool> {
+pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(
+    p: &InfoPool,
+    pred: &F,
+) -> Option<InfoPool> {
     let shrunk_pools = RemovalShrinker::new(p.clone()).chain(ScalarShrinker::new(p.clone()));
 
     debug!("Shrinking pool");
