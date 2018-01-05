@@ -34,6 +34,14 @@ pub struct InfoRecorder<I> {
     pub(crate) data: Vec<u8>,
 }
 
+/// An adapter that can record the shape of draws through various generators.
+#[derive(Debug)]
+pub struct SpanRecorder<I> {
+    inner: I,
+    spans: Vec<(usize, usize)>,
+    pos: usize,
+}
+
 impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
     fn draw_u8(&mut self) -> u8 {
         (**self).draw_u8()
@@ -72,16 +80,50 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     where
         Self: Sized,
     {
-        let start = self.data.len();
-        debug!("-> InfoRecorder::draw @{}", start);
-        let res = sink.sink(self);
-        let end = self.data.len();
-        debug!("<- InfoRecorder::draw @{}", end);
-        debug!("Span: {:?}", (start, end));
-        res
+        sink.sink(self)
     }
 }
 
+impl<I> SpanRecorder<I> {
+    /// Create a new SpanRecorder from the inner source.
+    pub fn new(inner: I) -> Self {
+        let spans = Vec::new();
+        let pos = 0;
+        SpanRecorder { inner, spans, pos }
+    }
+
+    /// Extract the inner source.
+    pub fn into_inner(self) -> I {
+        self.inner
+    }
+
+    #[cfg(test)]
+    fn spans_ref(&self) -> &[(usize, usize)] {
+        &self.spans
+    }
+}
+
+impl<I: InfoSource> InfoSource for SpanRecorder<I> {
+    fn draw_u8(&mut self) -> u8 {
+        let res = self.inner.draw_u8();
+        self.pos += 1;
+        res
+    }
+
+    fn draw<S: InfoSink>(&mut self, mut sink: S) -> S::Out
+    where
+        Self: Sized,
+    {
+        let start = self.pos;
+        let res = sink.sink(self);
+        debug!("-> InfoRecorder::draw @{}", start);
+        let end = self.pos;
+        debug!("<- InfoRecorder::draw @{}", end);
+        debug!("Span: {:?}", (start, end));
+        self.spans.push((start, end));
+        res
+    }
+}
 impl RngSource<XorShiftRng> {
     /// Creates a RngSource with a randomly seeded XorShift generator.
     pub fn new() -> Self {
@@ -195,6 +237,14 @@ mod tests {
         }
     }
 
+    struct FnSink<F>(F);
+    impl<F: FnMut(&mut InfoSource) -> R, R> InfoSink for FnSink<F> {
+        type Out = R;
+        fn sink<I: InfoSource>(&mut self, k: &mut I) -> R {
+            (self.0)(k as &mut InfoSource)
+        }
+    }
+
     #[test]
     fn should_take_each_item_in_pool() {
         let p = InfoPool::of_vec(vec![0, 1, 2, 3]);
@@ -249,14 +299,6 @@ mod tests {
 
     #[test]
     fn should_allow_restarting_child_reads() {
-        struct FnSink<F>(F);
-        impl<F: FnMut(&mut InfoSource) -> R, R> InfoSink for FnSink<F> {
-            type Out = R;
-            fn sink<I: InfoSource>(&mut self, k: &mut I) -> R {
-                (self.0)(k as &mut InfoSource)
-            }
-        }
-
         let mut p = InfoRecorder::new(RngSource::new());
         let mut v0 = Vec::new();
         p.draw(FnSink(|src: &mut InfoSource| {
@@ -278,14 +320,6 @@ mod tests {
 
     #[test]
     fn should_allow_restarting_mixed_child_reads() {
-        struct FnSink<F>(F);
-        impl<F: FnMut(&mut InfoSource) -> R, R> InfoSink for FnSink<F> {
-            type Out = R;
-            fn sink<I: InfoSource>(&mut self, k: &mut I) -> R {
-                (self.0)(k as &mut InfoSource)
-            }
-        }
-
         let mut p = InfoRecorder::new(RngSource::new());
         let mut v0 = Vec::new();
 
@@ -348,4 +382,103 @@ mod tests {
         assert_eq!(res, buf)
     }
 
+    #[test]
+    fn span_recorder_should_record_no_spans_for_primitive_draws() {
+        let mut p = SpanRecorder::new(RngSource::new());
+        {
+            for _ in 0..4 {
+                let _ = p.draw_u8();
+            }
+        }
+
+        assert_eq!(p.spans_ref(), &[])
+    }
+
+    #[test]
+    fn span_recorder_should_record_child_reads() {
+        let mut p = SpanRecorder::new(RngSource::new());
+        p.draw(FnSink(|src: &mut InfoSource| {
+            for _ in 0..4 {
+                let _ = src.draw_u8();
+            }
+        }));
+
+        assert_eq!(p.spans_ref(), &[(0, 4)])
+    }
+
+    #[test]
+    fn span_recorder_should_allow_restarting_mixed_child_reads() {
+        let mut p = SpanRecorder::new(RngSource::new());
+        let mut v0 = Vec::new();
+
+        for _ in 0..2 {
+            let x: u8 = p.draw_u8();
+            v0.push(x);
+        }
+
+        p.draw(FnSink(|src: &mut InfoSource| {
+            for _ in 0..4 {
+                let x: u8 = src.draw_u8();
+                v0.push(x);
+            }
+        }));
+
+        for _ in 0..2 {
+            let x: u8 = p.draw_u8();
+            v0.push(x);
+        }
+
+        assert_eq!(p.spans_ref(), &[(2, 6)])
+    }
+
+    #[test]
+    fn span_recorder_should_allow_yielded_slices_to_equal_recorded() {
+        let buf = vec![4, 3, 2, 1, 3, 4];
+        let p = InfoPool::of_vec(buf.clone());
+        let mut p = SpanRecorder::new(p.replay());
+        for _ in 0..2 {
+            let _ = p.draw_u8();
+        }
+
+        let v0 = p.draw(FnSink(|src: &mut InfoSource| {
+            let mut v0 = Vec::new();
+            for _ in 0..4 {
+                let x: u8 = src.draw_u8();
+                v0.push(x);
+            }
+            v0
+        }));
+
+        let actual = p.spans_ref()
+            .iter()
+            .map(|&(a, b)| buf[a..b].to_vec())
+            .collect::<Vec<_>>();
+        assert_eq!(actual, vec![v0]);
+    }
+
+    #[test]
+    fn span_recorder_works_recursively() {
+        struct MyWidget;
+
+        impl InfoSink for MyWidget {
+            type Out = Vec<u16>;
+            fn sink<I: InfoSource>(&mut self, src: &mut I) -> Self::Out {
+                let mut out = Vec::new();
+                for _ in 0..4 {
+                    let v = src.draw(FnSink(|src: &mut InfoSource| {
+                        let v0 = src.draw_u8() as u16;
+                        let v1 = src.draw_u8() as u16;
+                        (v1 << 8) | v0
+                    }));
+                    out.push(v);
+                }
+                out
+            }
+        }
+
+        let mut p = SpanRecorder::new(RngSource::new());
+        let _ = p.draw(MyWidget);
+
+        assert_eq!(p.spans_ref(), &[(0, 2), (2, 4), (4, 6), (6, 8), (0, 8)])
+    }
 }

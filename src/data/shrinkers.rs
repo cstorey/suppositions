@@ -21,6 +21,15 @@ struct RemovalShrinker {
     chunk: usize,
 }
 
+#[derive(Debug)]
+#[cfg(test)]
+struct DeltaDebugSegmentIterator {
+    size: usize,
+    log2sz: usize,
+    level: usize,
+    chunk: usize,
+}
+
 impl RemovalShrinker {
     fn new(seed: InfoPool) -> Self {
         let max_idx = seed.data.len().saturating_sub(1);
@@ -181,6 +190,62 @@ pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(
 }
 
 #[cfg(test)]
+fn ulog2(val: usize) -> usize {
+    let max_pow = 0usize.count_zeros() as usize;
+    max_pow - val.leading_zeros() as usize
+}
+
+#[cfg(test)]
+impl DeltaDebugSegmentIterator {
+    fn new(size: usize) -> Self {
+        let log2sz = ulog2(size.saturating_sub(1));
+        let level = 0;
+        let chunk = 0;
+        DeltaDebugSegmentIterator {
+            size,
+            log2sz,
+            level,
+            chunk,
+        }
+    }
+}
+
+#[cfg(test)]
+impl Iterator for DeltaDebugSegmentIterator {
+    type Item = (usize, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            trace!("DeltaDebugSegmentIterator#next: {:?}", self);
+            if self.level > self.log2sz {
+                return None;
+            }
+
+            let granularity = self.log2sz - self.level;
+            let width = 1 << granularity;
+            let chunk = self.chunk;
+
+            let start = chunk * width;
+            let end = start + width;
+
+            if start >= self.size {
+                trace!("Out of slice ({},{}) >= {}", start, end, self.size);
+                self.chunk = 0;
+                self.level += 1;
+                continue;
+            } else {
+                self.chunk += 1;
+            }
+            let start = min(start, self.size);
+            let end = min(end, self.size);
+
+            debug!("Yield start/end: {},{}", start, end);
+
+            return Some((start, end));
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     extern crate env_logger;
     use super::*;
@@ -288,6 +353,49 @@ mod tests {
                 .filter(|&(_, &v)| v != 1)
                 .collect::<BTreeMap<_, _>>()
         )
+    }
+
+    #[test]
+    fn delta_debug_segments_should_generate_segments_on_power_of_two_boundary() {
+        use std::collections::BTreeSet;
+        let iter = DeltaDebugSegmentIterator::new(7);
+        let items = iter.collect::<BTreeSet<_>>();
+        assert_eq!(
+            items,
+            vec![
+                (0, 7),
+                (0, 4),
+                (4, 7),
+                (0, 2),
+                (2, 4),
+                (4, 6),
+                (6, 7),
+                (0, 1),
+                (2, 3),
+                (4, 5),
+                (6, 7),
+                (1, 2),
+                (3, 4),
+                (5, 6),
+            ].into_iter()
+                .collect()
+        );
+    }
+
+    #[test]
+    fn delta_debug_segments_should_generate_segments_of_non_increasing_size() {
+        let lengths = DeltaDebugSegmentIterator::new(7)
+            .map(|(start, end)| end - start)
+            .collect::<Vec<_>>();
+
+        assert!(
+            lengths
+                .iter()
+                .zip(lengths.iter().skip(1))
+                .all(|(a, b)| a >= b),
+            "Generated lengths {:?} are monotonically decreasing",
+            lengths
+        );
     }
 
 }
