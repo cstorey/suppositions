@@ -14,7 +14,7 @@ use data::source::*;
 /// In other words, we remove the whole lot, then first half, second half,
 /// first quarter, second quarter, etc.
 #[derive(Debug)]
-struct RemovalShrinker {
+struct DeltaDebuggingRemovalsShrinker {
     seed: InfoPool,
     log2sz: usize,
     level: usize,
@@ -30,12 +30,12 @@ struct DeltaDebugSegmentIterator {
     chunk: usize,
 }
 
-impl RemovalShrinker {
+impl DeltaDebuggingRemovalsShrinker {
     fn new(seed: InfoPool) -> Self {
         let max_idx = seed.data.len().saturating_sub(1);
         let max_pow = 0usize.count_zeros();
         let pow = max_pow - max_idx.leading_zeros();
-        RemovalShrinker {
+        DeltaDebuggingRemovalsShrinker {
             seed,
             log2sz: pow as usize,
             // Ranges from 0..self.log2sz
@@ -46,11 +46,11 @@ impl RemovalShrinker {
     }
 }
 
-impl Iterator for RemovalShrinker {
+impl Iterator for DeltaDebuggingRemovalsShrinker {
     type Item = InfoPool;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            trace!("RemovalShrinker#next: {:?}", self);
+            trace!("DeltaDebuggingRemovalsShrinker#next: {:?}", self);
             if self.level > self.log2sz {
                 return None;
             }
@@ -166,7 +166,7 @@ pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(
     p: &InfoPool,
     pred: &F,
 ) -> Option<InfoPool> {
-    let shrunk_pools = RemovalShrinker::new(p.clone()).chain(ScalarShrinker::new(p.clone()));
+    let shrunk_pools = DeltaDebuggingRemovalsShrinker::new(p.clone()).chain(ScalarShrinker::new(p.clone()));
 
     debug!("Shrinking pool");
     let mut matching_shrinks = shrunk_pools.filter(|c| {
@@ -313,11 +313,11 @@ mod tests {
     }
 
     #[test]
-    fn shrink_by_removal_should_produce_somewhat_unique_outputs() {
+    fn shrink_by_delta_debug_removal_should_produce_somewhat_unique_outputs() {
         env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec((0..256usize).map(|v| v as u8).collect::<Vec<_>>());
         let mut counts = BTreeMap::new();
-        for val in RemovalShrinker::new(p) {
+        for val in DeltaDebuggingRemovalsShrinker::new(p) {
             debug!("{:?}", val);
             *counts.entry(val).or_insert(0) += 1;
         }
