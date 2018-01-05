@@ -21,13 +21,20 @@ struct DeltaDebuggingRemovalsShrinker {
     chunk: usize,
 }
 
-#[derive(Debug)]
 #[cfg(test)]
+#[derive(Debug)]
 struct DeltaDebugSegmentIterator {
     size: usize,
     log2sz: usize,
     level: usize,
     chunk: usize,
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+struct RemovalShrinker<I> {
+    seed: InfoPool,
+    segments: I,
 }
 
 impl DeltaDebuggingRemovalsShrinker {
@@ -166,7 +173,8 @@ pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(
     p: &InfoPool,
     pred: &F,
 ) -> Option<InfoPool> {
-    let shrunk_pools = DeltaDebuggingRemovalsShrinker::new(p.clone()).chain(ScalarShrinker::new(p.clone()));
+    let shrunk_pools =
+        DeltaDebuggingRemovalsShrinker::new(p.clone()).chain(ScalarShrinker::new(p.clone()));
 
     debug!("Shrinking pool");
     let mut matching_shrinks = shrunk_pools.filter(|c| {
@@ -245,6 +253,32 @@ impl Iterator for DeltaDebugSegmentIterator {
     }
 }
 
+#[cfg(test)]
+impl<I> RemovalShrinker<I> {
+    fn new(seed: InfoPool, segments: I) -> Self {
+        RemovalShrinker { seed, segments }
+    }
+}
+
+#[cfg(test)]
+impl<I: Iterator<Item = (usize, usize)>> Iterator for RemovalShrinker<I> {
+    type Item = InfoPool;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.segments.next().map(|(start, end)| {
+            let start = min(start, self.seed.data.len());
+            let end = min(end, self.seed.data.len());
+
+            let mut candidate = InfoPool::new();
+            candidate.data.clear();
+            candidate.data.extend(&self.seed.data[0..start]);
+            candidate.data.extend(&self.seed.data[end..]);
+            debug!("removed {},{}", start, end);
+            trace!("candidate {:?}", candidate);
+
+            candidate
+        })
+    }
+}
 #[cfg(test)]
 mod tests {
     extern crate env_logger;
@@ -398,4 +432,12 @@ mod tests {
         );
     }
 
+    #[test]
+    fn shrink_by_removal_should_remove_stated_slices() {
+        env_logger::init().unwrap_or(());
+        let p = InfoPool::of_vec(vec![0, 1, 2, 3, 4]);
+        let vals = RemovalShrinker::new(p, ::std::iter::once((2, 3))).collect::<Vec<_>>();
+
+        assert_eq!(vals, vec![InfoPool::of_vec(vec![0, 1, 3, 4])]);
+    }
 }
