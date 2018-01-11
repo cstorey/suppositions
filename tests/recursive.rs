@@ -1,12 +1,11 @@
-extern crate suppositions;
+extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
+extern crate suppositions;
 
 use std::ops::Add;
 use suppositions::*;
 use suppositions::generators::*;
-
 
 // Hutton's razor as an example.
 // Demonstrates recursive generators.
@@ -49,5 +48,4 @@ fn add_adds() {
         debug!("Testing: {:?} + {:?}", a, b);
         assert_eq!(a.eval() + b.eval(), (a + b).eval())
     });
-
 }

@@ -1,4 +1,3 @@
-
 use std::fmt;
 use std::panic;
 
@@ -81,16 +80,27 @@ where
     pub fn check<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(self, subject: F) {
         let mut stats = Stats::default();
         while stats.tests_run < self.config.num_tests {
-            trace!("Tests run: {}; skipped:{}", stats.tests_run, stats.items_skipped);
+            trace!(
+                "Tests run: {}; skipped:{}",
+                stats.tests_run,
+                stats.items_skipped
+            );
             self.try_one(&mut stats, &subject)
         }
         trace!("Completing okay");
     }
 
     fn try_one<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(
-            &self, stats: &mut Stats, subject: &F) {
-        let mut pool = InfoPool::new();
-        match self.gen.generate(&mut pool.tap()) {
+        &self,
+        stats: &mut Stats,
+        subject: &F,
+    ) {
+        let mut src = RngSource::new();
+        let mut pool = InfoRecorder::new(&mut src);
+        let result = pool.draw(&self.gen);
+        trace!("Pool: {:?}", pool);
+        let pool = pool.into_pool();
+        match result {
             Ok(arg) => {
                 stats.tests_run += 1;
                 self.try_example(subject, pool, arg)
@@ -102,9 +112,7 @@ where
                 if stats.items_skipped >= self.config.max_skips {
                     panic!(
                         "Could not finish on {}/{} tests (have skipped {} times)",
-                        stats.tests_run,
-                        self.config.num_tests,
-                        stats.items_skipped
+                        stats.tests_run, self.config.num_tests, stats.items_skipped
                     );
                 }
             }
@@ -114,33 +122,29 @@ where
         }
     }
 
-    fn try_example<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(&self, subject: &F, pool: InfoPool, arg: G::Item) {
+    fn try_example<R: CheckResult + fmt::Debug, F: Fn(G::Item) -> R>(
+        &self,
+        subject: &F,
+        pool: InfoPool,
+        arg: G::Item,
+    ) {
         let res = Self::attempt(&subject, arg);
-        trace!(
-            "Result: {:?} -> {:?}",
-            self.gen.generate(&mut pool.replay()),
-            res
-        );
+        trace!("Result: {:?} -> {:?}", pool.replay().draw(&self.gen), res);
         if res.is_failure() {
-            let minpool = find_minimal(
-                &self.gen,
-                pool,
-                |v| {
-                    trace!("Shrink attempt: {:?}", v);
-                    let res = Self::attempt(&subject, v);
-                    trace!("Shrink attempt -> {:?}", res);
-                    res.is_failure()
-                    },
-            );
+            let minpool = find_minimal(&self.gen, pool, |v| {
+                trace!("Shrink attempt: {:?}", v);
+                let res = Self::attempt(&subject, v);
+                trace!("Shrink attempt -> {:?}", res);
+                res.is_failure()
+            });
             trace!("Minpool: {:?}", minpool);
-            trace!("Values: {:?}", self.gen.generate(&mut minpool.replay()));
+            trace!("Values: {:?}", minpool.replay().draw(&self.gen));
             panic!(
                 "Predicate failed for argument {:?}; check returned {:?}",
-                self.gen.generate(&mut minpool.replay()),
+                minpool.replay().draw(&self.gen),
                 res
             )
         }
-
     }
 
     fn attempt<R: CheckResult, F: Fn(G::Item) -> R>(subject: F, arg: G::Item) -> Result<R, String> {

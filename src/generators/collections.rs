@@ -22,6 +22,10 @@ pub struct CollectionGenerator<C, G> {
     mean_length: usize,
 }
 
+/// See [`choice`](fn.choice.html)
+#[derive(Debug, Clone)]
+pub struct ChoiceGenerator<T>(Vec<T>);
+
 /// Generates vectors with items given by `inner`.
 pub fn vecs<G>(inner: G) -> VecGenerator<G> {
     VecGenerator {
@@ -55,6 +59,11 @@ where
     }
 }
 
+/// Returns a random item from the array.
+pub fn choice<T>(items: Vec<T>) -> ChoiceGenerator<T> {
+    ChoiceGenerator(items)
+}
+
 impl<G> VecGenerator<G> {
     /// Specify the mean length of the vector.
     pub fn mean_length(mut self, mean: usize) -> Self {
@@ -65,22 +74,23 @@ impl<G> VecGenerator<G> {
 
 impl<G: Generator> Generator for VecGenerator<G> {
     type Item = Vec<G::Item>;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let mut result = Vec::new();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
-        let bs = weighted_coin(1.0 - p_is_final);
-        while bs.generate(src)? {
-            let item = self.inner.generate(src)?;
+        debug!("-> VecGenerator::generate");
+        let opts = optional_by(weighted_coin(1.0 - p_is_final), &self.inner);
+        while let Some(item) = src.draw(&opts)? {
             result.push(item)
         }
 
+        debug!("<- VecGenerator::generate");
         Ok(result)
     }
 }
 
 impl Generator for InfoPoolGenerator {
     type Item = InfoPool;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let mut result = Vec::new();
         let vals = u8s();
         for _ in 0..self.0 {
@@ -102,21 +112,54 @@ impl<G, C> CollectionGenerator<C, G> {
 }
 impl<G: Generator, C: Default + Extend<G::Item>> Generator for CollectionGenerator<C, G> {
     type Item = C;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        debug!("-> CollectionGenerator::generate");
         let mut coll: C = Default::default();
         let p_is_final = 1.0 / (1.0 + self.mean_length as f32);
-        let bs = weighted_coin(1.0 - p_is_final);
-        while bs.generate(src)? {
-            let item = self.inner.generate(src)?;
+        let opts = optional_by(weighted_coin(1.0 - p_is_final), &self.inner);
+        while let Some(item) = src.draw(&opts)? {
             coll.extend(iter::once(item));
         }
 
+        debug!("<- CollectionGenerator::generate");
         Ok(coll)
+    }
+}
+
+impl<T: Clone> Generator for ChoiceGenerator<T> {
+    type Item = T;
+
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        let &ChoiceGenerator(ref options) = self;
+        if options.len() == 0 {
+            warn!("Empty instance of ChoiceGenerator");
+            return Err(DataError::SkipItem);
+        }
+
+        debug_assert!(options.len() <= u32::max_value() as usize);
+
+        debug!("-> ChoiceGenerator::generate");
+        // Slow as ... a very slow thing, and result in a non-optimal shrink.
+        let off = src.draw(&uptos(usizes(), options.len()))?;
+        // these are both very fast.
+        // let off = src.draw(&uptos(u32s(), options.len() as u32))? as usize;
+        // let off = src.draw(&uptos(u32s().map(|n| (n as usize) << 32), options.len()))?;
+
+        // let v = !u32s().generate(src)?;
+        // let off = (v as usize * self.0.len()) >> 32;
+
+        // let v = !src.draw(&u32s())?;
+        // let off = (v as usize * options.len()) >> 32;
+
+        let res = options[off].clone();
+        debug!("<- ChoiceGenerator::generate");
+        Ok(res)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::LinkedList;
     use env_logger;
     use generators::core::*;
     use generators::collections::*;
@@ -130,6 +173,54 @@ mod tests {
     #[test]
     fn vecs_usually_generates_different_output_for_different_inputs() {
         usually_generates_different_output_for_different_inputs(vecs(booleans()))
+    }
+
+    #[derive(Debug)]
+    struct Tracer<'a, I: 'a> {
+        inner: &'a mut I,
+        child_draws: usize,
+    }
+
+    impl<'a, I> Tracer<'a, I> {
+        fn new(inner: &'a mut I) -> Self {
+            let child_draws = 0;
+            Tracer { inner, child_draws }
+        }
+    }
+
+    impl<'a, I: InfoSource> InfoSource for Tracer<'a, I> {
+        fn draw_u8(&mut self) -> u8 {
+            self.inner.draw_u8()
+        }
+        fn draw<S: InfoSink>(&mut self, sink: S) -> S::Out
+        where
+            Self: Sized,
+        {
+            debug!("-> Tracer::draw");
+            self.child_draws += 1;
+            let res = self.inner.draw(sink);
+            debug!("<- Tracer::draw");
+            res
+        }
+    }
+
+    #[test]
+    fn vecs_records_at_least_as_many_leaves_as_elements() {
+        env_logger::init().unwrap_or(());
+        let nitems = 100;
+        let gen = vecs(booleans());
+        for _ in 0..nitems {
+            let mut src = RngSource::new();
+            let mut rec = Tracer::new(&mut src);
+            let val = gen.generate(&mut rec).expect("generate");
+
+            assert!(
+                rec.child_draws == val.len() + 1,
+                "child_draws:{} == val.len:{}",
+                rec.child_draws,
+                val.len()
+            );
+        }
     }
 
     #[test]
@@ -168,6 +259,24 @@ mod tests {
     fn collections_u64s_minimize_to_empty() {
         use std::collections::BTreeSet;
         should_minimize_to(collections::<BTreeSet<_>, _>(u8s()), BTreeSet::new());
+    }
+
+    #[test]
+    fn collections_records_at_least_as_many_leaves_as_elements() {
+        let nitems = 100;
+        let gen = collections::<LinkedList<_>, _>(u64s());
+        for _ in 0..nitems {
+            let mut src = RngSource::new();
+            let mut rec = Tracer::new(&mut src);
+            let val = gen.generate(&mut rec).expect("generate");
+
+            assert!(
+                rec.child_draws == val.len() + 1,
+                "child_draws:{} == val.len:{}",
+                rec.child_draws,
+                val.len()
+            );
+        }
     }
 
     mod vector_lengths {

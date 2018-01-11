@@ -41,7 +41,6 @@
 
 ## ???
 * [ ] Track which bytes (regions) are used for which generators; use this in shrinking
-
 ## Backlog
 
 * Generators
@@ -72,3 +71,117 @@
 # Implementation notes:
 ## `generators::one_of`
 Rather than boxing values, maybe consider using a type-level thing? End with an impl that uses boxing (in `generators::boxed`) and a type-level induction based one (`generators::unboxed`) that sadly has horrible type errors.
+
+## Shrinking tracking.
+This then leaves us with the problem of ... how to keep track of usage on subsequent shrinks. Create region tracker as a wrapper?
+
+```rust
+enum Extent {
+  Leaf(usize), // Leaf Size
+  Branch(Vec<Extent>),
+}
+struct ExtentTracker<I> {
+  src: I,
+}
+
+// Top level consumer
+fn stuff() {
+  let mut tracker = ExtendTracker::new(pool.replay());
+  self.gen.generate(&mut tracker);
+  let root_extent = tracker.root();
+}
+
+// Consumer
+impl<G: Generator> Generator for Foo<G> {
+  fn generate<I: Iterator<Item = u8>>(&self, src: &mut ExtentTracker<I>) -> Maybe<Self::Item> {
+    while self.new_items(src)? {
+      let v = self.inner.generate(&mut src.child());
+      self.chunk(v);
+    };
+    Ok(...);
+  }
+}
+```
+
+This organisation has the nice property that 
+
+For an example with:
+
+```rust
+enum Foo {
+  Bar,
+  Quux(usize)
+}
+```
+
+A `Vec<Foo>` would have the following layout:
+
+```
+ * Vec<Foo> -- Derived from a sequence of Option<Foo>
+   * next/weighted coin:true
+   * Foo
+     * is_quux:true
+     * Quux(u64)
+       * 42usize
+   * next/weighted coin:true
+   * Foo
+     * is_quux:false
+     * Bar
+   * next/weighted coin: false
+```
+
+Which ends up being represented as: 
+```
+Extent::Branch(/*Vec<Foo>*/ vec![
+  Leaf(/*weighted coin*/ 1),
+  Branch(/*Foo*/ vec![
+    Leaf(/* is quux */, 1), Leaf(/* 42usize */ 8)]), 
+  Leaf(/*weighted coin*/ 1),
+  Branch(/*Foo*/ vec![
+    Leaf(/* is quux */, 1), Leaf(/* 42usize */ 0)]), 
+  Leaf(/*weighted coin*/ 1)])
+```
+
+it'd be possible to encode a type id to encompass such notions as "replace expression with subexpression of same type" and similar. Questions:
+
+We want to be able to replay each level at a time. So If we shrink from a vector of 2 items to one, then we still want to generate the same information for items following the Vec, rather than generating something completely different. Otherwise, this would make something of a mockery of our "shrinking".
+
+Put another way, when you stop consuming the sequence of (weighted_coin >> Foo), any Widget generators afterwards should get the same input. If we somehow end up consuming _more_ from the current branch, that branch should just return zeros once exhausted.
+
+Turn the minimizers into iterators?
+
+## Alternative; Hash/Rand style
+
+```rust
+enum Extent {
+  Leaf(usize), // Leaf Size
+  Branch(Vec<Extent>),
+}
+struct ExtentTracker<I> {
+  src: I,
+}
+
+trait InfoSource {
+  fn draw<G: Generator>(&mut src, gen: G) -> Maybe<G::Item>;
+  fn draw_u8(&mut src) -> Maybe<u8>;
+}
+
+// Top level consumer
+fn stuff() {
+  let mut tracker = ExtendTracker::new(pool.replay());
+  let val = tracker.draw(&self.gen);
+  // ... 
+  let root_extent = tracker.root();
+}
+
+// Consumer
+impl<G: Generator> Generator for Foo<G> {
+  fn generate<I: InfoSource>(&self, src: &mut ExtentTracker<I>) -> Maybe<Self::Item> {
+    while src.draw(self.has_next_gen())? {
+      let v = src.draw(&self.inner)
+      self.chunk(v);
+    };
+    Ok(...);
+  }
+}
+```

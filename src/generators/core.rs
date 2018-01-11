@@ -13,7 +13,7 @@ pub struct BoolGenerator;
 pub struct WeightedCoinGenerator(f32);
 /// See [`optional`](fn.optional.html)
 #[derive(Debug, Clone)]
-pub struct OptionalGenerator<G>(G);
+pub struct OptionalGenerator<B, G>(B, G);
 /// See [`result`](fn.result.html)
 #[derive(Debug, Clone)]
 pub struct ResultGenerator<G, H>(G, H);
@@ -36,11 +36,7 @@ pub trait OneOfItem {
     /// [`Generator`](trait.Generator.html) ipmlementation for
     /// (`OneOfGenerator`)[struct.OneOfGenerator.html], we either call our
     /// generator directly, or delegate to the next in the chain.
-    fn generate_or_delegate<I: Iterator<Item = u8>>(
-        &self,
-        depth: usize,
-        tap: &mut I,
-    ) -> Maybe<Self::Item>;
+    fn generate_or_delegate<I: InfoSource>(&self, depth: usize, tap: &mut I) -> Maybe<Self::Item>;
 }
 
 /// Internal implementation for [`one_of`](fn.one_of.html). Forms the
@@ -66,6 +62,9 @@ pub struct FilterMapped<G, F>(G, F);
 /// See [`Generator::map`](trait.Generator.html#method.map)
 #[derive(Debug, Clone)]
 pub struct Mapped<G, F>(G, F);
+/// See [`Generator::flat_map`](trait.Generator.html#method.flat_map)
+#[derive(Debug, Clone)]
+pub struct FlatMapped<G, F>(G, F);
 /// See [`consts`](fn.consts.html)
 #[derive(Debug, Clone)]
 pub struct Const<V>(V);
@@ -80,7 +79,7 @@ pub trait Generator {
     type Item;
     /// This consumes a stream of bytes given by `source`, and generates a
     /// value of type `Self::Item`.
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item>;
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item>;
     /// A convenience function to generate a value directly from an `InfoPool`.
     fn generate_from(&self, src: &InfoPool) -> Maybe<Self::Item> {
         self.generate(&mut src.replay())
@@ -114,6 +113,22 @@ pub trait Generator {
     {
         Mapped(self, fun)
     }
+
+    /// A generator that allows creating a new generator based on the results
+    /// of a previous generator.
+    fn flat_map<H: Generator, F: Fn(Self::Item) -> H>(self, fun: F) -> FlatMapped<Self, F>
+    where
+        Self: Sized,
+    {
+        FlatMapped(self, fun)
+    }
+}
+
+impl<'a, G: Generator> InfoSink for &'a G {
+    type Out = Maybe<G::Item>;
+    fn sink<I: InfoSource>(&mut self, src: &mut I) -> Self::Out {
+        self.generate(src)
+    }
 }
 
 /// Like [`Generator`](trait.Generator.html), but allows use as a trait object.
@@ -122,7 +137,7 @@ pub trait GeneratorObject {
     type Item;
     /// This consumes a stream of bytes given by `source`, and generates a
     /// value of type `Self::Item`.
-    fn generate_obj(&self, src: &mut Iterator<Item = u8>) -> Maybe<Self::Item>;
+    fn generate_obj(&self, src: &mut InfoSource) -> Maybe<Self::Item>;
 }
 
 /// An extension trait that allows use of methods that assume Self has a known
@@ -147,15 +162,15 @@ where
 
 impl<G: Generator> GeneratorObject for G {
     type Item = G::Item;
-    fn generate_obj(&self, mut src: &mut Iterator<Item = u8>) -> Maybe<Self::Item> {
+    fn generate_obj(&self, mut src: &mut InfoSource) -> Maybe<Self::Item> {
         (*self).generate(&mut src)
     }
 }
 
 impl<T> Generator for Box<GeneratorObject<Item = T>> {
     type Item = T;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        (**self).generate_obj(src as &mut Iterator<Item = u8>)
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        (**self).generate_obj(src as &mut InfoSource)
     }
 }
 
@@ -163,8 +178,6 @@ impl<T> Generator for Box<GeneratorObject<Item = T>> {
 pub fn booleans() -> BoolGenerator {
     BoolGenerator
 }
-
-
 
 /// Always generates a clone of the given value.
 pub fn consts<V: Clone>(val: V) -> Const<V> {
@@ -178,8 +191,14 @@ pub fn weighted_coin(p: f32) -> WeightedCoinGenerator {
 
 /// Generates an Optional<_> value with a 50% chance of `Some(_)` from the
 /// `inner` generator, otherwise None.
-pub fn optional<G>(inner: G) -> OptionalGenerator<G> {
-    OptionalGenerator(inner)
+pub fn optional<G>(inner: G) -> OptionalGenerator<BoolGenerator, G> {
+    OptionalGenerator(booleans(), inner)
+}
+
+/// Generates an Optional<_> value using `bools` to decide whether to choose
+/// `Some(_)` from the `inner` generator, otherwise None.
+pub fn optional_by<B, G>(bools: B, inner: G) -> OptionalGenerator<B, G> {
+    OptionalGenerator(bools, inner)
 }
 
 /// Generates either an okay value from `ok`; or an error from `err`, with 50% chance of each.
@@ -187,41 +206,48 @@ pub fn result<G: Generator, H: Generator>(ok: G, err: H) -> ResultGenerator<G, H
     ResultGenerator(ok, err)
 }
 
-
 /// Returns a lazily evaluated generator. The `thunk` should be pure.
 /// Mostly used to allow recursive generators.
 pub fn lazy<F: Fn() -> G, G: Generator>(thunk: F) -> LazyGenerator<F> {
     LazyGenerator(thunk)
 }
 
-
-impl Generator for BoolGenerator {
-    type Item = bool;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        src.next().map(|val| val >= 0x80).ok_or(
-            DataError::PoolExhausted,
-        )
+impl<'a, G: Generator> Generator for &'a G {
+    type Item = G::Item;
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        (**self).generate(src)
     }
 }
 
+impl Generator for BoolGenerator {
+    type Item = bool;
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        debug!("-> BoolGenerator::generate");
+        let res = src.draw_u8() >= 0x80;
+        debug!("<- BoolGenerator::generate");
+        Ok(res)
+    }
+}
 
-impl<G: Generator> Generator for OptionalGenerator<G> {
+impl<B: Generator<Item = bool>, G: Generator> Generator for OptionalGenerator<B, G> {
     type Item = Option<G::Item>;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
-        let bs = booleans();
-        let result = if bs.generate(src)? {
-            Some(self.0.generate(src)?)
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        debug!("-> OptionalGenerator::generate");
+        let &OptionalGenerator(ref bools, ref gen) = self;
+        let result = if src.draw(bools)? {
+            Some(src.draw(gen)?)
         } else {
             None
         };
 
+        debug!("<- OptionalGenerator::generate");
         Ok(result)
     }
 }
 
 impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
     type Item = Result<G::Item, H::Item>;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &ResultGenerator(ref ok, ref err) = self;
         let bs = booleans();
         let result = if bs.generate(src)? {
@@ -236,7 +262,7 @@ impl<G: Generator, H: Generator> Generator for ResultGenerator<G, H> {
 
 impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
     type Item = G::Item;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &Filtered(ref gen, ref pred) = self;
         let val = gen.generate(src)?;
         if pred(&val) {
@@ -249,7 +275,7 @@ impl<G: Generator, F: Fn(&G::Item) -> bool> Generator for Filtered<G, F> {
 
 impl<G: Generator, R, F: Fn(G::Item) -> Maybe<R>> Generator for FilterMapped<G, F> {
     type Item = R;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &FilterMapped(ref gen, ref f) = self;
         let val = gen.generate(src)?;
         let out = f(val)?;
@@ -259,7 +285,7 @@ impl<G: Generator, R, F: Fn(G::Item) -> Maybe<R>> Generator for FilterMapped<G, 
 
 impl<G: Generator, R, F: Fn(G::Item) -> R> Generator for Mapped<G, F> {
     type Item = R;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let &Mapped(ref gen, ref f) = self;
         let val = gen.generate(src)?;
         let out = f(val);
@@ -267,19 +293,31 @@ impl<G: Generator, R, F: Fn(G::Item) -> R> Generator for Mapped<G, F> {
     }
 }
 
+impl<G: Generator, H: Generator, F: Fn(G::Item) -> H> Generator for FlatMapped<G, F> {
+    type Item = H::Item;
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        let &FlatMapped(ref gen, ref f) = self;
+        let gen2 = gen.generate(src)?;
+        let out = f(gen2).generate(src)?;
+        Ok(out)
+    }
+}
+
 impl<V: Clone> Generator for Const<V> {
     type Item = V;
-    fn generate<I: Iterator<Item = u8>>(&self, _: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, _: &mut I) -> Maybe<Self::Item> {
         Ok(self.0.clone())
     }
 }
 
 impl Generator for WeightedCoinGenerator {
     type Item = bool;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
+        debug!("-> WeightedCoinGenerator::generate");
         let &WeightedCoinGenerator(p) = self;
         let v = uniform_f32s().generate(src)?;
         let res = v > (1.0 - p);
+        debug!("<- WeightedCoinGenerator::generate");
         Ok(res)
     }
 }
@@ -316,23 +354,18 @@ impl<GS: OneOfItem> OneOfGenerator<GS> {
 
 impl<F: Fn() -> G, G: Generator> Generator for LazyGenerator<F> {
     type Item = G::Item;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let g = self.0();
         g.generate(src)
     }
 }
-
 
 impl<G: Generator, R: OneOfItem<Item = G::Item>> OneOfItem for OneOfSnoc<G, R> {
     type Item = G::Item;
     fn len(&self) -> usize {
         self.rest.len() + 1
     }
-    fn generate_or_delegate<I: Iterator<Item = u8>>(
-        &self,
-        depth: usize,
-        tap: &mut I,
-    ) -> Maybe<Self::Item> {
+    fn generate_or_delegate<I: InfoSource>(&self, depth: usize, tap: &mut I) -> Maybe<Self::Item> {
         if depth == 0 {
             self.gen.generate(tap)
         } else {
@@ -346,11 +379,7 @@ impl<G: Generator> OneOfItem for OneOfTerm<G> {
     fn len(&self) -> usize {
         1
     }
-    fn generate_or_delegate<I: Iterator<Item = u8>>(
-        &self,
-        depth: usize,
-        tap: &mut I,
-    ) -> Maybe<Self::Item> {
+    fn generate_or_delegate<I: InfoSource>(&self, depth: usize, tap: &mut I) -> Maybe<Self::Item> {
         debug_assert_eq!(depth, 0);
         self.gen.generate(tap)
     }
@@ -358,7 +387,7 @@ impl<G: Generator> OneOfItem for OneOfTerm<G> {
 
 impl<GS: OneOfItem> Generator for OneOfGenerator<GS> {
     type Item = GS::Item;
-    fn generate<I: Iterator<Item = u8>>(&self, src: &mut I) -> Maybe<Self::Item> {
+    fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let v = !u32s().generate(src)?;
         let it = (v as usize * self.0.len()) >> 32;
         self.0.generate_or_delegate(it, src)
@@ -373,9 +402,7 @@ pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(
     pool: InfoPool,
     check: F,
 ) -> InfoPool {
-    minimize(&pool, &|mut t| {
-        gen.generate(&mut t).map(|v| check(v)).unwrap_or(false)
-    }).unwrap_or(pool)
+    minimize(&pool, &|t| t.draw(&gen).map(|v| check(v)).unwrap_or(false))
 }
 
 #[cfg(test)]
@@ -402,7 +429,6 @@ pub mod tests {
         InfoPool::of_vec((0..size).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>())
     }
 
-
     pub fn should_generate_same_output_given_same_input<G: Generator>(gen: G)
     where
         G::Item: fmt::Debug + PartialEq,
@@ -411,9 +437,8 @@ pub mod tests {
             .map(|_| gen_random_vec())
             .map(|v0| (InfoPool::of_vec(v0.clone()), InfoPool::of_vec(v0)))
             .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.replay()).and_then(|v0| {
-                    gen.generate(&mut p1.replay()).map(|v1| (p0, p1, v0, v1))
-                })
+                gen.generate(&mut p0.replay())
+                    .and_then(|v0| gen.generate(&mut p1.replay()).map(|v1| (p0, p1, v0, v1)))
             })
             .take(100)
         {
@@ -431,15 +456,13 @@ pub mod tests {
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
             .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.replay()).and_then(|v0| {
-                    gen.generate(&mut p1.replay()).map(|v1| (v0, v1))
-                })
+                gen.generate(&mut p0.replay())
+                    .and_then(|v0| gen.generate(&mut p1.replay()).map(|v1| (v0, v1)))
             })
             .take(nitems)
             .filter(|&(ref v0, ref v1)| v0 != v1)
             .count();
         assert!(differing > 0, "Differing items:{} > 0", differing);
-
     }
 
     // Mostly only useful for scalar quantities. For collections, we basically say:
@@ -469,9 +492,8 @@ pub mod tests {
             .filter(|&(ref v0, ref v1)| v0 < v1)
             .map(|(v0, v1)| (InfoPool::of_vec(v0), InfoPool::of_vec(v1)))
             .flat_map(|(p0, p1)| {
-                gen.generate(&mut p0.replay()).and_then(|v0| {
-                    gen.generate(&mut p1.replay()).map(|v1| (p0, p1, v0, v1))
-                })
+                gen.generate(&mut p0.replay())
+                    .and_then(|v0| gen.generate(&mut p1.replay()).map(|v1| (p0, p1, v0, v1)))
             })
             .take(nitems)
         {
@@ -520,20 +542,20 @@ pub mod tests {
     {
         let mut p;
         loop {
-            p = InfoPool::new();
-            match gen.generate(&mut p.tap()) {
+            p = InfoRecorder::new(RngSource::new());
+            match gen.generate(&mut p) {
                 Ok(_) => break,
                 Err(DataError::SkipItem) => (),
                 Err(DataError::PoolExhausted) => panic!("Not enough pool to generate data"),
             }
         }
+        let p = p.into_pool();
         debug!("Before: {:?}", p);
         let p = find_minimal(&gen, p, |_| true);
         debug!("After: {:?}", p);
 
         let val = gen.generate(&mut p.replay()).expect("generated value");
         assert_eq!(val, expected);
-
     }
 
     #[test]
@@ -549,6 +571,7 @@ pub mod tests {
 
     #[test]
     fn bools_minimize_to_false() {
+        env_logger::init().unwrap_or(());
         should_minimize_to(booleans(), false)
     }
 
@@ -557,10 +580,15 @@ pub mod tests {
         should_partially_order_same_as_source(booleans())
     }
 
-
     #[test]
     fn optional_u64s_minimize_to_none() {
         should_minimize_to(optional(u64s()), None);
+    }
+
+    #[test]
+    fn optional_by_coin_of_u64s_minimize_to_none() {
+        let gen = optional_by(weighted_coin(3.0f32 / 4.0), u64s());
+        should_minimize_to(gen, None);
     }
 
     #[test]
@@ -616,12 +644,10 @@ pub mod tests {
 
     #[test]
     fn filter_map_should_skip_when_err() {
-        let gen = consts(())
-            .filter_map(|()| -> Result<(), DataError> { Err(DataError::SkipItem) });
+        let gen = consts(()).filter_map(|()| -> Result<(), DataError> { Err(DataError::SkipItem) });
         let p = InfoPool::new();
         assert_eq!(gen.generate_from(&p), Err(DataError::SkipItem));
     }
-
 
     #[test]
     fn one_of_should_pick_choices_relativey_evenly() {
@@ -640,7 +666,9 @@ pub mod tests {
 
         println!("Histogram: {:?}", samples);
         assert!(
-            samples.values().all(|&val| val >= (expected - allowed_error) && val <= (expected + allowed_error)),
+            samples
+                .values()
+                .all(|&val| val >= (expected - allowed_error) && val <= (expected + allowed_error)),
             "Sample counts from {} trials are all ({}+/-{}); got {:?}",
             trials,
             expected,

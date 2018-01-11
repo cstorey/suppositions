@@ -1,7 +1,7 @@
-extern crate suppositions;
+extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
+extern crate suppositions;
 
 use suppositions::*;
 use suppositions::generators::*;
@@ -82,7 +82,6 @@ fn trivial_result_failure() {
 fn trivial_result_includes_failing_result() {
     property((booleans())).check(|_| -> Result<(), &'static str> { Err("horrible failure") })
 }
-
 
 #[test]
 fn trivial_result_pass() {

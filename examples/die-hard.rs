@@ -1,11 +1,10 @@
-extern crate suppositions;
+extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
+extern crate suppositions;
 use std::cmp::min;
 use suppositions::*;
 use suppositions::generators::*;
-
 
 // Run this with:
 // ```
@@ -17,7 +16,6 @@ use suppositions::generators::*;
 // Ok([FillBigJug, BigToSmall, EmptySmallJug, BigToSmall, FillBigJug, BigToSmall]);
 // check returned Ok(Err(State { big: 4, small: 3 }))', src/properties.rs:56:24
 // ```
-
 
 #[derive(Debug, Clone)]
 pub enum Op {
