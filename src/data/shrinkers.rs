@@ -99,25 +99,32 @@ impl Iterator for ScalarShrinker {
 /// Reducing individual values basically goes through each position in the
 /// pool, and then tries reducing it to zero, then half, thn three quarters,
 /// seven eighths, and so on.
-pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(
+pub fn minimize<F: Fn(&mut InfoRecorder<InfoReplay>) -> bool>(
     p: &InfoPool,
     pred: &F,
 ) -> Option<InfoPool> {
+    debug!("Shrinking pool");
+    trace!("Pool: {:?}", p);
+
+    let interval_removals = RemovalShrinker::remove_recorded_intervals(p.clone());
     let delta_removals = RemovalShrinker::delta_debug_of_pool(p.clone());
     let scalars = ScalarShrinker::new(p.clone());
-    let shrunk_pools = delta_removals.chain(scalars);
+    let shrunk_pools = interval_removals.chain(delta_removals).chain(scalars);
 
-    debug!("Shrinking pool");
-    let mut matching_shrinks = shrunk_pools.filter(|c| {
-        let pool = InfoRecorder::new(c.replay());
-        let test = pred(pool);
+    let mut matching_shrinks = shrunk_pools.filter_map(|c| {
+        let test = pred(&mut InfoRecorder::new(c.replay()));
         trace!("test result: {:?} <= {:?}", test, c);
-        test
+        // We need to extract the execution trace from the pool at this point.
+        if test {
+            Some(c)
+        } else {
+            None
+        }
     });
 
     if let Some(candidate) = matching_shrinks.next() {
         debug!("Re-Shrinking");
-        trace!("candidate {:?}", candidate);
+        trace!("minimize candidate {:?}", candidate);
         let result = minimize(&candidate, pred).unwrap_or(candidate);
         debug!("Re-Shrinking done");
         Some(result)
@@ -174,7 +181,7 @@ impl Iterator for DeltaDebugSegmentIterator {
             let start = min(start, self.size);
             let end = min(end, self.size);
 
-            debug!("Yield start/end: {},{}", start, end);
+            debug!("DeltaDebugSegmentIterator::next() -> ({},{})", start, end);
 
             return Some((start, end));
         }
@@ -184,6 +191,13 @@ impl Iterator for DeltaDebugSegmentIterator {
 impl<I> RemovalShrinker<I> {
     fn new(seed: InfoPool, segments: I) -> Self {
         RemovalShrinker { seed, segments }
+    }
+}
+
+impl RemovalShrinker<InfoPoolIntervalsIter> {
+    fn remove_recorded_intervals(seed: InfoPool) -> Self {
+        let segments = seed.spans_iter();
+        RemovalShrinker::new(seed, segments)
     }
 }
 
@@ -255,6 +269,7 @@ mod tests {
     }
     #[test]
     fn minimiser_should_minimise_scalar_values_to_empty() {
+        env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec(vec![255; 3]);
         let min =
             minimize(&p, &|t| take_n(t, 16).into_iter().any(|_| true)).expect("some smaller pool");

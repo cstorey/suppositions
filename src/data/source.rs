@@ -1,4 +1,5 @@
 use std::fmt;
+use std::iter;
 use hex_slice::AsHex;
 use rand::{random, Rng, XorShiftRng};
 
@@ -35,6 +36,8 @@ pub struct InfoRecorder<I> {
     spans: Vec<(usize, usize)>,
 }
 
+pub(in data) struct InfoPoolIntervalsIter(iter::Rev<::std::vec::IntoIter<(usize, usize)>>);
+
 impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
     fn draw_u8(&mut self) -> u8 {
         (**self).draw_u8()
@@ -59,7 +62,10 @@ impl<I> InfoRecorder<I> {
 
     /// Extracts the data recorded.
     pub fn into_pool(self) -> InfoPool {
-        InfoPool::of_vec(self.data)
+        InfoPool {
+            data: self.data,
+            spans: self.spans,
+        }
     }
 
     #[cfg(test)]
@@ -79,7 +85,6 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     where
         Self: Sized,
     {
-
         let start = self.data.len();
         debug!("-> InfoRecorder::draw @{}", start);
         let res = sink.sink(self);
@@ -115,6 +120,7 @@ impl<R: Rng> InfoSource for RngSource<R> {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InfoPool {
     pub(in data) data: Vec<u8>,
+    pub(in data) spans: Vec<(usize, usize)>,
 }
 
 /// A handle to an info Pool that we can draw replayed bytes from, and zero after.
@@ -128,6 +134,7 @@ impl fmt::Debug for InfoPool {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("InfoPool")
             .field("data", &format_args!("{:x}", self.data.as_hex()))
+            .field("spans", &self.spans)
             .finish()
     }
 }
@@ -145,13 +152,16 @@ impl InfoPool {
     /// Create an `InfoPool` with a given vector of bytes. (Mostly used for
     /// testing).
     pub fn of_vec(data: Vec<u8>) -> Self {
-        InfoPool { data: data }
+        let spans = Vec::new();
+        InfoPool { data, spans }
     }
 
     /// Create an `InfoPool` with a `size` length vector of random bytes
     /// using the generator `rng`. (Mostly used for testing).
     pub fn new() -> Self {
-        Self { data: Vec::new() }
+        let spans = Vec::new();
+        let data = Vec::new();
+        Self { data, spans }
     }
 
     /// Allows access to the underlying buffer.
@@ -165,6 +175,15 @@ impl InfoPool {
             data: &*self.data,
             off: 0,
         }
+    }
+
+    #[cfg(test)]
+    fn spans(&self) -> &[(usize, usize)] {
+        &self.spans
+    }
+
+    pub(in data) fn spans_iter(&self) -> InfoPoolIntervalsIter {
+        InfoPoolIntervalsIter(self.spans.clone().into_iter().rev())
     }
 }
 
@@ -193,7 +212,14 @@ impl<'a> InfoSource for InfoReplay<'a> {
         sink.sink(self)
     }
 }
-
+impl Iterator for InfoPoolIntervalsIter {
+    type Item = (usize, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.0.next();
+        debug!("InfoPoolIntervalsIter::next() -> {:?}", res);
+        res
+    }
+}
 #[cfg(test)]
 mod tests {
     extern crate env_logger;
@@ -317,6 +343,35 @@ mod tests {
         assert_eq!(v0, v1)
     }
 
+    #[test]
+    fn recorded_info_pool_should_contain_intervals() {
+        let mut p = InfoRecorder::new(RngSource::new());
+        let mut v0 = Vec::new();
+
+        for _ in 0..2 {
+            let x: u8 = p.draw_u8();
+            v0.push(x);
+        }
+
+        p.draw(FnSink(|src: &mut InfoSource| {
+            for _ in 0..4 {
+                let x: u8 = src.draw_u8();
+                v0.push(x);
+            }
+        }));
+
+        for _ in 0..2 {
+            let x: u8 = p.draw_u8();
+            v0.push(x);
+        }
+
+        let p = p.into_pool();
+        assert!(
+            p.spans().contains(&(2, 6)),
+            "Pool spans: {:?}; contains (2, 6)",
+            p.spans()
+        );
+    }
     #[test]
     fn should_allow_borrowing_buffer() {
         let p = InfoPool::of_vec(vec![1]);

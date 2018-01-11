@@ -402,9 +402,7 @@ pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(
     pool: InfoPool,
     check: F,
 ) -> InfoPool {
-    minimize(&pool, &|mut t| {
-        t.draw(&gen).map(|v| check(v)).unwrap_or(false)
-    }).unwrap_or(pool)
+    minimize(&pool, &|t| t.draw(&gen).map(|v| check(v)).unwrap_or(false)).unwrap_or(pool)
 }
 
 #[cfg(test)]
