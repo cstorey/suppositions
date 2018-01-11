@@ -14,15 +14,6 @@ use data::source::*;
 /// In other words, we remove the whole lot, then first half, second half,
 /// first quarter, second quarter, etc.
 #[derive(Debug)]
-struct DeltaDebuggingRemovalsShrinker {
-    seed: InfoPool,
-    log2sz: usize,
-    level: usize,
-    chunk: usize,
-}
-
-#[cfg(test)]
-#[derive(Debug)]
 struct DeltaDebugSegmentIterator {
     size: usize,
     log2sz: usize,
@@ -30,71 +21,10 @@ struct DeltaDebugSegmentIterator {
     chunk: usize,
 }
 
-#[cfg(test)]
 #[derive(Debug)]
 struct RemovalShrinker<I> {
     seed: InfoPool,
     segments: I,
-}
-
-impl DeltaDebuggingRemovalsShrinker {
-    fn new(seed: InfoPool) -> Self {
-        let max_idx = seed.data.len().saturating_sub(1);
-        let max_pow = 0usize.count_zeros();
-        let pow = max_pow - max_idx.leading_zeros();
-        DeltaDebuggingRemovalsShrinker {
-            seed,
-            log2sz: pow as usize,
-            // Ranges from 0..self.log2sz
-            level: 0,
-            // Ranges from 0..(1<<self.level)
-            chunk: 0,
-        }
-    }
-}
-
-impl Iterator for DeltaDebuggingRemovalsShrinker {
-    type Item = InfoPool;
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            trace!("DeltaDebuggingRemovalsShrinker#next: {:?}", self);
-            if self.level > self.log2sz {
-                return None;
-            }
-
-            let granularity = self.log2sz - self.level;
-            let width = 1 << granularity;
-            let chunk = self.chunk;
-
-            let start = chunk * width;
-            let end = start + width;
-
-            if start >= self.seed.data.len() {
-                trace!(
-                    "Out of slice ({},{}) >= {}",
-                    start,
-                    end,
-                    self.seed.data.len()
-                );
-                self.chunk = 0;
-                self.level += 1;
-                continue;
-            } else {
-                self.chunk += 1;
-            }
-            let start = min(start, self.seed.data.len());
-            let end = min(end, self.seed.data.len());
-
-            let mut candidate = InfoPool::new();
-            candidate.data.clear();
-            candidate.data.extend(&self.seed.data[0..start]);
-            candidate.data.extend(&self.seed.data[end..]);
-            debug!("removed {},{}", start, end);
-            trace!("candidate {:?}", candidate);
-
-            return Some(candidate);
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -173,8 +103,9 @@ pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(
     p: &InfoPool,
     pred: &F,
 ) -> Option<InfoPool> {
-    let shrunk_pools =
-        DeltaDebuggingRemovalsShrinker::new(p.clone()).chain(ScalarShrinker::new(p.clone()));
+    let delta_removals = RemovalShrinker::delta_debug_of_pool(p.clone());
+    let scalars = ScalarShrinker::new(p.clone());
+    let shrunk_pools = delta_removals.chain(scalars);
 
     debug!("Shrinking pool");
     let mut matching_shrinks = shrunk_pools.filter(|c| {
@@ -197,13 +128,11 @@ pub fn minimize<F: Fn(InfoRecorder<InfoReplay>) -> bool>(
     }
 }
 
-#[cfg(test)]
 fn ulog2(val: usize) -> usize {
     let max_pow = 0usize.count_zeros() as usize;
     max_pow - val.leading_zeros() as usize
 }
 
-#[cfg(test)]
 impl DeltaDebugSegmentIterator {
     fn new(size: usize) -> Self {
         let log2sz = ulog2(size.saturating_sub(1));
@@ -218,7 +147,6 @@ impl DeltaDebugSegmentIterator {
     }
 }
 
-#[cfg(test)]
 impl Iterator for DeltaDebugSegmentIterator {
     type Item = (usize, usize);
     fn next(&mut self) -> Option<Self::Item> {
@@ -253,14 +181,19 @@ impl Iterator for DeltaDebugSegmentIterator {
     }
 }
 
-#[cfg(test)]
 impl<I> RemovalShrinker<I> {
     fn new(seed: InfoPool, segments: I) -> Self {
         RemovalShrinker { seed, segments }
     }
 }
 
-#[cfg(test)]
+impl RemovalShrinker<DeltaDebugSegmentIterator> {
+    fn delta_debug_of_pool(seed: InfoPool) -> Self {
+        let len = seed.data.len();
+        RemovalShrinker::new(seed, DeltaDebugSegmentIterator::new(len))
+    }
+}
+
 impl<I: Iterator<Item = (usize, usize)>> Iterator for RemovalShrinker<I> {
     type Item = InfoPool;
     fn next(&mut self) -> Option<Self::Item> {
@@ -351,7 +284,7 @@ mod tests {
         env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec((0..256usize).map(|v| v as u8).collect::<Vec<_>>());
         let mut counts = BTreeMap::new();
-        for val in DeltaDebuggingRemovalsShrinker::new(p) {
+        for val in RemovalShrinker::delta_debug_of_pool(p) {
             debug!("{:?}", val);
             *counts.entry(val).or_insert(0) += 1;
         }
