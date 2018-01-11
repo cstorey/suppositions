@@ -1,5 +1,6 @@
 use std::cmp::min;
 use data::source::*;
+use std::collections::HashSet;
 
 /// Iterates over a series of shrunk pools. If we imagine that our buffer has
 /// a sz of (1 << (log2sz-1)) < sz ≤ (1 << log2sz), then where:
@@ -99,46 +100,58 @@ impl Iterator for ScalarShrinker {
 /// Reducing individual values basically goes through each position in the
 /// pool, and then tries reducing it to zero, then half, thn three quarters,
 /// seven eighths, and so on.
-pub fn minimize<F: Fn(&mut InfoRecorder<InfoReplay>) -> bool>(p: &InfoPool, pred: &F) -> InfoPool {
-    let mut best = p.clone();
-    while let Some(next) = shrink_once(&best, pred) {
-        debug!("Re-Shrinking");
-        best = next;
+pub fn minimize<F: Fn(&mut InfoRecorder<InfoReplay>) -> bool>(
+    orig: &InfoPool,
+    pred: &F,
+) -> InfoPool {
+    let mut best = orig.clone();
+    // this might be better as something that we can apply a window to,
+    // or bloom filter.
+    let mut seen = HashSet::new();
+
+    loop {
+        debug!("Shrinking pool");
+        debug!("Seen {:?} pools", seen.len());
+        trace!("Pool: {:?}", best);
+
+        let interval_removals = RemovalShrinker::remove_recorded_intervals(best.clone());
+        let delta_removals = RemovalShrinker::delta_debug_of_pool(best.clone());
+        let scalars = ScalarShrinker::new(best.clone());
+        let shrunk_pools = interval_removals.chain(delta_removals).chain(scalars);
+
+        {
+            let mut matching_shrinks = shrunk_pools.filter_map(|c| {
+                if seen.contains(&c) {
+                    debug!("Skipping seen item");
+                    return None;
+                }
+                seen.insert(c.clone());
+
+                let mut recorder = InfoRecorder::new(c.replay());
+                let test = pred(&mut recorder);
+                trace!("test result: {:?} <= {:?}", test, c);
+                // Extract the execution trace from the pool at this point.
+                if test {
+                    Some(recorder.into_pool())
+                } else {
+                    None
+                }
+            });
+
+            if let Some(candidate) = matching_shrinks.next() {
+                debug!("Re-Shrinking");
+                best = candidate;
+            } else {
+                debug!("Nothing smaller found");
+                trace!("... than {:?}", best);
+                break;
+            }
+        }
+
+        trace!("Note best: {:?}", best);
     }
 
     best
-}
-
-fn shrink_once<F: Fn(&mut InfoRecorder<InfoReplay>) -> bool>(
-    p: &InfoPool,
-    pred: &F,
-) -> Option<InfoPool> {
-    debug!("Shrinking pool");
-    trace!("Pool: {:?}", p);
-
-    let interval_removals = RemovalShrinker::remove_recorded_intervals(p.clone());
-    let delta_removals = RemovalShrinker::delta_debug_of_pool(p.clone());
-    let scalars = ScalarShrinker::new(p.clone());
-    let shrunk_pools = interval_removals.chain(delta_removals).chain(scalars);
-
-    let mut matching_shrinks = shrunk_pools.filter_map(|c| {
-        let test = pred(&mut InfoRecorder::new(c.replay()));
-        trace!("test result: {:?} <= {:?}", test, c);
-        // We need to extract the execution trace from the pool at this point.
-        if test {
-            Some(c)
-        } else {
-            None
-        }
-    });
-
-    if let Some(candidate) = matching_shrinks.next() {
-        Some(candidate)
-    } else {
-        debug!("Nothing smaller found");
-        trace!("... than {:?}", p);
-        None
-    }
 }
 
 fn ulog2(val: usize) -> usize {
@@ -238,6 +251,17 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
 
+    // The end of the buffer is semantically equivalent to zero for generators,
+    // so we can ignore those.
+    fn without_trailing_zeroes(mut buf: &[u8]) -> &[u8] {
+        while buf.last() == Some(&0) {
+            let l = buf.len();
+            buf = &buf[..l - 1]
+        }
+
+        buf
+    }
+
     #[test]
     fn minimiser_should_minimise_to_empty() {
         let p = InfoPool::of_vec(vec![1]);
@@ -262,7 +286,7 @@ mod tests {
             take_n(t, 16).into_iter().filter(|&v| v > 0).count() > 1
         });
 
-        assert_eq!(min.buffer(), &[1, 1])
+        assert_eq!(without_trailing_zeroes(min.buffer()), &[1, 1])
     }
 
     #[test]
@@ -270,7 +294,7 @@ mod tests {
         let p = InfoPool::of_vec(vec![255; 3]);
         let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 3));
 
-        assert_eq!(min.buffer(), &[3])
+        assert_eq!(without_trailing_zeroes(min.buffer()), &[3])
     }
     #[test]
     fn minimiser_should_minimise_scalar_values_to_empty() {
@@ -278,7 +302,7 @@ mod tests {
         let p = InfoPool::of_vec(vec![255; 3]);
         let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|_| true));
 
-        assert_eq!(min.buffer(), &[] as &[u8])
+        assert_eq!(without_trailing_zeroes(min.buffer()), &[] as &[u8])
     }
 
     #[test]
@@ -286,14 +310,14 @@ mod tests {
         let p = InfoPool::of_vec(vec![255; 3]);
         let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 13));
 
-        assert_eq!(min.buffer(), &[13])
+        assert_eq!(without_trailing_zeroes(min.buffer()), &[13])
     }
     #[test]
     fn minimiser_should_minimise_scalar_values_accounting_for_overflow() {
         let p = InfoPool::of_vec(vec![255; 3]);
         let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 251));
 
-        assert_eq!(min.buffer(), &[251])
+        assert_eq!(without_trailing_zeroes(min.buffer()), &[251])
     }
 
     #[test]

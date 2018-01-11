@@ -571,6 +571,7 @@ pub mod tests {
 
     #[test]
     fn bools_minimize_to_false() {
+        env_logger::init().unwrap_or(());
         should_minimize_to(booleans(), false)
     }
 
