@@ -99,7 +99,17 @@ impl Iterator for ScalarShrinker {
 /// Reducing individual values basically goes through each position in the
 /// pool, and then tries reducing it to zero, then half, thn three quarters,
 /// seven eighths, and so on.
-pub fn minimize<F: Fn(&mut InfoRecorder<InfoReplay>) -> bool>(
+pub fn minimize<F: Fn(&mut InfoRecorder<InfoReplay>) -> bool>(p: &InfoPool, pred: &F) -> InfoPool {
+    let mut best = p.clone();
+    while let Some(next) = shrink_once(&best, pred) {
+        debug!("Re-Shrinking");
+        best = next;
+    }
+
+    best
+}
+
+fn shrink_once<F: Fn(&mut InfoRecorder<InfoReplay>) -> bool>(
     p: &InfoPool,
     pred: &F,
 ) -> Option<InfoPool> {
@@ -123,11 +133,7 @@ pub fn minimize<F: Fn(&mut InfoRecorder<InfoReplay>) -> bool>(
     });
 
     if let Some(candidate) = matching_shrinks.next() {
-        debug!("Re-Shrinking");
-        trace!("minimize candidate {:?}", candidate);
-        let result = minimize(&candidate, pred).unwrap_or(candidate);
-        debug!("Re-Shrinking done");
-        Some(result)
+        Some(candidate)
     } else {
         debug!("Nothing smaller found");
         trace!("... than {:?}", p);
@@ -237,7 +243,7 @@ mod tests {
         let p = InfoPool::of_vec(vec![1]);
         let min = minimize(&p, &|_| true);
 
-        assert_eq!(min.as_ref().map(|p| p.buffer()), Some([].as_ref()))
+        assert_eq!(min.buffer(), &[0u8; 0])
     }
 
     fn take_n<I: InfoSource>(mut src: I, n: usize) -> Vec<u8> {
@@ -254,7 +260,7 @@ mod tests {
         let p = InfoPool::of_vec(vec![1; 4]);
         let min = minimize(&p, &|t| {
             take_n(t, 16).into_iter().filter(|&v| v > 0).count() > 1
-        }).expect("some smaller pool");
+        });
 
         assert_eq!(min.buffer(), &[1, 1])
     }
@@ -262,8 +268,7 @@ mod tests {
     #[test]
     fn minimiser_should_minimise_scalar_values() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 3))
-            .expect("some smaller pool");
+        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 3));
 
         assert_eq!(min.buffer(), &[3])
     }
@@ -271,8 +276,7 @@ mod tests {
     fn minimiser_should_minimise_scalar_values_to_empty() {
         env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min =
-            minimize(&p, &|t| take_n(t, 16).into_iter().any(|_| true)).expect("some smaller pool");
+        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|_| true));
 
         assert_eq!(min.buffer(), &[] as &[u8])
     }
@@ -280,16 +284,14 @@ mod tests {
     #[test]
     fn minimiser_should_minimise_scalar_values_by_search() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 13))
-            .expect("some smaller pool");
+        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 13));
 
         assert_eq!(min.buffer(), &[13])
     }
     #[test]
     fn minimiser_should_minimise_scalar_values_accounting_for_overflow() {
         let p = InfoPool::of_vec(vec![255; 3]);
-        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 251))
-            .expect("some smaller pool");
+        let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|v| v >= 251));
 
         assert_eq!(min.buffer(), &[251])
     }
