@@ -86,11 +86,11 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
         Self: Sized,
     {
         let start = self.data.len();
-        debug!("-> InfoRecorder::draw @{}", start);
+        trace!("-> InfoRecorder::draw @{}", start);
         let res = sink.sink(self);
         let end = self.data.len();
-        debug!("<- InfoRecorder::draw @{}", end);
-        debug!("Span: {:?}", (start, end));
+        trace!("<- InfoRecorder::draw @{}", end);
+        trace!("Span: {:?}", (start, end));
         self.spans.push((start, end));
         res
     }
@@ -216,7 +216,7 @@ impl Iterator for InfoPoolIntervalsIter {
     type Item = (usize, usize);
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.0.next();
-        debug!("InfoPoolIntervalsIter::next() -> {:?}", res);
+        trace!("InfoPoolIntervalsIter::next() -> {:?}", res);
         res
     }
 }

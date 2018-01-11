@@ -222,9 +222,9 @@ impl<'a, G: Generator> Generator for &'a G {
 impl Generator for BoolGenerator {
     type Item = bool;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        debug!("-> BoolGenerator::generate");
+        trace!("-> BoolGenerator::generate");
         let res = src.draw_u8() >= 0x80;
-        debug!("<- BoolGenerator::generate");
+        trace!("<- BoolGenerator::generate");
         Ok(res)
     }
 }
@@ -232,7 +232,7 @@ impl Generator for BoolGenerator {
 impl<B: Generator<Item = bool>, G: Generator> Generator for OptionalGenerator<B, G> {
     type Item = Option<G::Item>;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        debug!("-> OptionalGenerator::generate");
+        trace!("-> OptionalGenerator::generate");
         let &OptionalGenerator(ref bools, ref gen) = self;
         let result = if src.draw(bools)? {
             Some(src.draw(gen)?)
@@ -240,7 +240,7 @@ impl<B: Generator<Item = bool>, G: Generator> Generator for OptionalGenerator<B,
             None
         };
 
-        debug!("<- OptionalGenerator::generate");
+        trace!("<- OptionalGenerator::generate");
         Ok(result)
     }
 }
@@ -313,11 +313,11 @@ impl<V: Clone> Generator for Const<V> {
 impl Generator for WeightedCoinGenerator {
     type Item = bool;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        debug!("-> WeightedCoinGenerator::generate");
+        trace!("-> WeightedCoinGenerator::generate");
         let &WeightedCoinGenerator(p) = self;
         let v = uniform_f32s().generate(src)?;
         let res = v > (1.0 - p);
-        debug!("<- WeightedCoinGenerator::generate");
+        trace!("<- WeightedCoinGenerator::generate");
         Ok(res)
     }
 }
@@ -550,9 +550,9 @@ pub mod tests {
             }
         }
         let p = p.into_pool();
-        debug!("Before: {:?}", p);
+        trace!("Before: {:?}", p);
         let p = find_minimal(&gen, p, |_| true);
-        debug!("After: {:?}", p);
+        trace!("After: {:?}", p);
 
         let val = gen.generate(&mut p.replay()).expect("generated value");
         assert_eq!(val, expected);
