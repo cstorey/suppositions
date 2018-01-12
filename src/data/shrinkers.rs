@@ -174,7 +174,7 @@ impl DeltaDebugSegmentIterator {
 }
 
 impl Iterator for DeltaDebugSegmentIterator {
-    type Item = (usize, usize);
+    type Item = Span;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             trace!("DeltaDebugSegmentIterator#next: {:?}", self);
@@ -202,7 +202,7 @@ impl Iterator for DeltaDebugSegmentIterator {
 
             debug!("DeltaDebugSegmentIterator::next() -> ({},{})", start, end);
 
-            return Some((start, end));
+            return Some(Span::of_pair((start, end)));
         }
     }
 }
@@ -227,18 +227,18 @@ impl RemovalShrinker<DeltaDebugSegmentIterator> {
     }
 }
 
-impl<I: Iterator<Item = (usize, usize)>> Iterator for RemovalShrinker<I> {
+impl<I: Iterator<Item = Span>> Iterator for RemovalShrinker<I> {
     type Item = InfoPool;
     fn next(&mut self) -> Option<Self::Item> {
-        self.segments.next().map(|(start, end)| {
-            let start = min(start, self.seed.data.len());
-            let end = min(end, self.seed.data.len());
+        self.segments.next().map(|span| {
+            // let start = min(start, self.seed.data.len());
+            // let end = min(end, self.seed.data.len());
 
             let mut candidate = InfoPool::new();
             candidate.data.clear();
-            candidate.data.extend(&self.seed.data[0..start]);
-            candidate.data.extend(&self.seed.data[end..]);
-            debug!("removed {},{}", start, end);
+            candidate.data.extend(&self.seed.data[span.before()]);
+            candidate.data.extend(&self.seed.data[span.after()]);
+            debug!("removed {:?}", span);
             trace!("candidate {:?}", candidate);
 
             candidate
@@ -385,7 +385,7 @@ mod tests {
                 (1, 2),
                 (3, 4),
                 (5, 6),
-            ].into_iter()
+            ].into_iter().map(Span::of_pair)
                 .collect()
         );
     }
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     fn delta_debug_segments_should_generate_segments_of_non_increasing_size() {
         let lengths = DeltaDebugSegmentIterator::new(7)
-            .map(|(start, end)| end - start)
+            .map(|span| { let (start, end) = span.as_pair(); end - start })
             .collect::<Vec<_>>();
 
         assert!(
@@ -410,7 +410,7 @@ mod tests {
     fn shrink_by_removal_should_remove_stated_slices() {
         env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec(vec![0, 1, 2, 3, 4]);
-        let vals = RemovalShrinker::new(p, ::std::iter::once((2, 3))).collect::<Vec<_>>();
+        let vals = RemovalShrinker::new(p, ::std::iter::once(Span::of_pair((2, 3)))).collect::<Vec<_>>();
 
         assert_eq!(vals, vec![InfoPool::of_vec(vec![0, 1, 3, 4])]);
     }

@@ -28,15 +28,21 @@ pub struct RngSource<R> {
     rng: R,
 }
 
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone, Default)]
+pub(in data) struct Span {
+    start: usize,
+    end: usize,
+}
+
 /// An adapter that can record the data drawn from an underlying source.
 #[derive(Debug)]
 pub struct InfoRecorder<I> {
     inner: I,
     pub(crate) data: Vec<u8>,
-    spans: Vec<(usize, usize)>,
+    spans: Vec<Span>,
 }
 
-pub(in data) struct InfoPoolIntervalsIter(iter::Rev<::std::vec::IntoIter<(usize, usize)>>);
+pub(in data) struct InfoPoolIntervalsIter(iter::Rev<::std::vec::IntoIter<Span>>);
 
 impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
     fn draw_u8(&mut self) -> u8 {
@@ -69,8 +75,8 @@ impl<I> InfoRecorder<I> {
     }
 
     #[cfg(test)]
-    fn spans_ref(&self) -> &[(usize, usize)] {
-        &self.spans
+    pub(in data) fn spans_iter(&self) -> InfoPoolIntervalsIter {
+        InfoPoolIntervalsIter(self.spans.clone().into_iter().rev())
     }
 }
 
@@ -90,8 +96,8 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
         let res = sink.sink(self);
         let end = self.data.len();
         trace!("<- InfoRecorder::draw @{}", end);
-        trace!("Span: {:?}", (start, end));
-        self.spans.push((start, end));
+        debug!("Span: {:?}", (start, end));
+        self.spans.push(Span { start, end });
         res
     }
 }
@@ -120,7 +126,7 @@ impl<R: Rng> InfoSource for RngSource<R> {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InfoPool {
     pub(in data) data: Vec<u8>,
-    pub(in data) spans: Vec<(usize, usize)>,
+    pub(in data) spans: Vec<Span>,
 }
 
 /// A handle to an info Pool that we can draw replayed bytes from, and zero after.
@@ -178,7 +184,7 @@ impl InfoPool {
     }
 
     #[cfg(test)]
-    fn spans(&self) -> &[(usize, usize)] {
+    fn spans(&self) -> &[Span] {
         &self.spans
     }
 
@@ -213,17 +219,40 @@ impl<'a> InfoSource for InfoReplay<'a> {
     }
 }
 impl Iterator for InfoPoolIntervalsIter {
-    type Item = (usize, usize);
+    type Item = Span;
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.0.next();
         trace!("InfoPoolIntervalsIter::next() -> {:?}", res);
         res
     }
 }
+
+impl Span {
+    #[cfg(test)]
+    pub(in data) fn as_pair(&self) -> (usize, usize) {
+        (self.start, self.end)
+    }
+    pub (in data) fn of_pair((start, end): (usize, usize)) -> Self {
+        Span { start, end, .. Span::default() }
+    }
+
+    #[cfg(test)]
+    fn range(&self) -> ::std::ops::Range<usize> {
+        self.start..self.end
+    }
+
+    pub (in data) fn before(&self) -> ::std::ops::RangeTo<usize> {
+        ..self.start
+    }
+    pub (in data) fn after(&self) -> ::std::ops::RangeFrom<usize> {
+        self.end..
+    }
+}
 #[cfg(test)]
 mod tests {
     extern crate env_logger;
     use super::*;
+    use std::collections::BTreeSet;
     impl<R: Rng> RngSource<R> {
         pub(crate) fn of(rng: R) -> Self {
             RngSource { rng }
@@ -367,7 +396,7 @@ mod tests {
 
         let p = p.into_pool();
         assert!(
-            p.spans().contains(&(2, 6)),
+            p.spans().contains(&Span::of_pair((2, 6))),
             "Pool spans: {:?}; contains (2, 6)",
             p.spans()
         );
@@ -413,7 +442,7 @@ mod tests {
             }
         }
 
-        assert_eq!(p.spans_ref(), &[])
+        assert_eq!(p.spans_iter().collect::<Vec<Span>>(), vec![])
     }
 
     #[test]
@@ -425,7 +454,7 @@ mod tests {
             }
         }));
 
-        assert_eq!(p.spans_ref(), &[(0, 4)])
+        assert_eq!(p.spans_iter().collect::<Vec<_>>(), vec![Span::of_pair((0, 4))])
     }
 
     #[test]
@@ -450,7 +479,7 @@ mod tests {
             v0.push(x);
         }
 
-        assert_eq!(p.spans_ref(), &[(2, 6)])
+        assert_eq!(p.spans_iter().collect::<Vec<_>>(), vec![Span::of_pair((2, 6))])
     }
 
     #[test]
@@ -471,9 +500,8 @@ mod tests {
             v0
         }));
 
-        let actual = p.spans_ref()
-            .iter()
-            .map(|&(a, b)| buf[a..b].to_vec())
+        let actual = p.spans_iter()
+            .map(|span| buf[span.range()].to_vec())
             .collect::<Vec<_>>();
         assert_eq!(actual, vec![v0]);
     }
@@ -501,6 +529,9 @@ mod tests {
         let mut p = InfoRecorder::new(RngSource::new());
         let _ = p.draw(MyWidget);
 
-        assert_eq!(p.spans_ref(), &[(0, 2), (2, 4), (4, 6), (6, 8), (0, 8)])
+        assert_eq!(p.spans_iter().collect::<BTreeSet<_>>(),
+            vec![(0, 2), (2, 4), (4, 6), (6, 8), (0, 8)].into_iter()
+            .map(Span::of_pair).collect(),
+        )
     }
 }
