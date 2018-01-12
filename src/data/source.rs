@@ -32,6 +32,7 @@ pub struct RngSource<R> {
 pub(in data) struct Span {
     start: usize,
     end: usize,
+    level: usize,
 }
 
 /// An adapter that can record the data drawn from an underlying source.
@@ -40,6 +41,7 @@ pub struct InfoRecorder<I> {
     inner: I,
     pub(crate) data: Vec<u8>,
     spans: Vec<Span>,
+    level: usize,
 }
 
 pub(in data) struct InfoPoolIntervalsIter(iter::Rev<::std::vec::IntoIter<Span>>);
@@ -63,6 +65,7 @@ impl<I> InfoRecorder<I> {
             inner: inner,
             data: Vec::new(),
             spans: Vec::new(),
+            level: 0,
         }
     }
 
@@ -92,12 +95,15 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
         Self: Sized,
     {
         let start = self.data.len();
+        let level = self.level;
+        self.level += 1;
         trace!("-> InfoRecorder::draw @{}", start);
         let res = sink.sink(self);
         let end = self.data.len();
         trace!("<- InfoRecorder::draw @{}", end);
         debug!("Span: {:?}", (start, end));
-        self.spans.push(Span { start, end });
+        self.level = level;
+        self.spans.push(Span { start, end, level });
         res
     }
 }
@@ -529,9 +535,9 @@ mod tests {
         let mut p = InfoRecorder::new(RngSource::new());
         let _ = p.draw(MyWidget);
 
-        assert_eq!(p.spans_iter().collect::<BTreeSet<_>>(),
-            vec![(0, 2), (2, 4), (4, 6), (6, 8), (0, 8)].into_iter()
-            .map(Span::of_pair).collect(),
-        )
+        let spans = p.spans_iter().collect::<BTreeSet<_>>();
+        let expected = Span { start: 2, end: 4, level: 1 };
+        assert!(spans.contains(&expected),
+            "expected: {:?} ∈ spans: {:?}", expected, spans);
     }
 }
