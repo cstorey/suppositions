@@ -385,7 +385,8 @@ mod tests {
                 (1, 2),
                 (3, 4),
                 (5, 6),
-            ].into_iter().map(Span::of_pair)
+            ].into_iter()
+                .map(Span::of_pair)
                 .collect()
         );
     }
@@ -393,7 +394,10 @@ mod tests {
     #[test]
     fn delta_debug_segments_should_generate_segments_of_non_increasing_size() {
         let lengths = DeltaDebugSegmentIterator::new(7)
-            .map(|span| { let (start, end) = span.as_pair(); end - start })
+            .map(|span| {
+                let (start, end) = span.as_pair();
+                end - start
+            })
             .collect::<Vec<_>>();
 
         assert!(
@@ -410,7 +414,8 @@ mod tests {
     fn shrink_by_removal_should_remove_stated_slices() {
         env_logger::init().unwrap_or(());
         let p = InfoPool::of_vec(vec![0, 1, 2, 3, 4]);
-        let vals = RemovalShrinker::new(p, ::std::iter::once(Span::of_pair((2, 3)))).collect::<Vec<_>>();
+        let vals =
+            RemovalShrinker::new(p, ::std::iter::once(Span::of_pair((2, 3)))).collect::<Vec<_>>();
 
         assert_eq!(vals, vec![InfoPool::of_vec(vec![0, 1, 3, 4])]);
     }

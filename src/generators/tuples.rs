@@ -2,7 +2,8 @@ use generators::core::*;
 use data::*;
 
 macro_rules! tuple_generator_impl {
-    ($gen_a:ident: $var_a:ident: $type_a:ident $(, $gen_n: ident: $var_n:ident: $type_n:ident)*) => (
+    ($gen_a:ident: $var_a:ident: $type_a:ident
+        $(, $gen_n: ident: $var_n:ident: $type_n:ident)*) => (
         impl<$type_a: Generator, $($type_n: Generator),*> Generator
                 for ($type_a, $($type_n),*) {
                     type Item = ($type_a::Item, $($type_n::Item),*);

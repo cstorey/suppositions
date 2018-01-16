@@ -238,8 +238,12 @@ impl Span {
     pub(in data) fn as_pair(&self) -> (usize, usize) {
         (self.start, self.end)
     }
-    pub (in data) fn of_pair((start, end): (usize, usize)) -> Self {
-        Span { start, end, .. Span::default() }
+    pub(in data) fn of_pair((start, end): (usize, usize)) -> Self {
+        Span {
+            start,
+            end,
+            ..Span::default()
+        }
     }
 
     #[cfg(test)]
@@ -247,10 +251,10 @@ impl Span {
         self.start..self.end
     }
 
-    pub (in data) fn before(&self) -> ::std::ops::RangeTo<usize> {
+    pub(in data) fn before(&self) -> ::std::ops::RangeTo<usize> {
         ..self.start
     }
-    pub (in data) fn after(&self) -> ::std::ops::RangeFrom<usize> {
+    pub(in data) fn after(&self) -> ::std::ops::RangeFrom<usize> {
         self.end..
     }
 }
@@ -460,7 +464,10 @@ mod tests {
             }
         }));
 
-        assert_eq!(p.spans_iter().collect::<Vec<_>>(), vec![Span::of_pair((0, 4))])
+        assert_eq!(
+            p.spans_iter().collect::<Vec<_>>(),
+            vec![Span::of_pair((0, 4))]
+        )
     }
 
     #[test]
@@ -485,7 +492,10 @@ mod tests {
             v0.push(x);
         }
 
-        assert_eq!(p.spans_iter().collect::<Vec<_>>(), vec![Span::of_pair((2, 6))])
+        assert_eq!(
+            p.spans_iter().collect::<Vec<_>>(),
+            vec![Span::of_pair((2, 6))]
+        )
     }
 
     #[test]
@@ -536,8 +546,16 @@ mod tests {
         let _ = p.draw(MyWidget);
 
         let spans = p.spans_iter().collect::<BTreeSet<_>>();
-        let expected = Span { start: 2, end: 4, level: 1 };
-        assert!(spans.contains(&expected),
-            "expected: {:?} ∈ spans: {:?}", expected, spans);
+        let expected = Span {
+            start: 2,
+            end: 4,
+            level: 1,
+        };
+        assert!(
+            spans.contains(&expected),
+            "expected: {:?} ∈ spans: {:?}",
+            expected,
+            spans
+        );
     }
 }

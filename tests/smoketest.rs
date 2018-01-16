@@ -103,7 +103,7 @@ fn panic_includes_failure_message() {
 /*
 Currently fails with:
 ```
-    thread 'panic_includes_minimal_example' panicked at 'Predicate failed for argument Ok(72057594037927936); check returned Ok(false)', src/properties.rs:137:12
+    ... 'Predicate failed for argument Ok(72057594037927936); check returned Ok(false)'...
     note: Panic did not include expected string '123457890'
 ```
 
@@ -124,8 +124,8 @@ fn panic_includes_minimal_example_padding_error() {
 Currently fails with:
 ```
 ---- panic_includes_minimal_example_rounding_errors stdout ----
-        thread 'panic_includes_minimal_example_rounding_errors' panicked at 'Predicate failed for argument Ok(1245187); check returned Ok(false)', src/properties.rs:137:12
-note: Panic did not include expected string '1234567'
+    ... 'Predicate failed for argument Ok(1245187); check returned Ok(false)'...
+    note: Panic did not include expected string '1234567'
 ```
 
 This occurrs because:
