@@ -43,6 +43,7 @@ pub trait OneOfItem {
 /// terminating case of the induction.
 #[derive(Debug, Clone)]
 pub struct OneOfTerm<G> {
+    weight: usize,
     gen: G,
 }
 /// Internal implementation for [`one_of`](fn.one_of.html). Forms a
@@ -50,6 +51,7 @@ pub struct OneOfTerm<G> {
 #[derive(Debug, Clone)]
 pub struct OneOfSnoc<G, R> {
     rest: R,
+    weight: usize,
     gen: G,
 }
 
@@ -322,8 +324,9 @@ impl Generator for WeightedCoinGenerator {
     }
 }
 
-/// Allows the user to use one of a set of alternative generators.
-/// Often useful when you need to generate elements of an enum.
+/// Allows the user to use one of a set of alternative generators Often
+/// useful when you need to generate elements of an enum. Assumes a weighting
+/// of 1.
 ///
 /// ```
 /// use suppositions::generators::*;
@@ -334,17 +337,43 @@ impl Generator for WeightedCoinGenerator {
 /// ```
 
 pub fn one_of<G: Generator + 'static>(inner: G) -> OneOfGenerator<OneOfTerm<G>> {
-    OneOfGenerator(OneOfTerm { gen: inner })
+    one_of_weighted(1, inner)
+}
+
+/// Allows the user to use one of a set of alternative generators with
+/// specified integer weightings Otherwise identical to
+/// [`one_of`](fn.one_of.html)
+
+pub fn one_of_weighted<G: Generator + 'static>(
+    weight: usize,
+    inner: G,
+) -> OneOfGenerator<OneOfTerm<G>> {
+    OneOfGenerator(OneOfTerm {
+        gen: inner,
+        weight: weight,
+    })
 }
 
 impl<GS: OneOfItem> OneOfGenerator<GS> {
-    /// Specifies an alternative data generator. See [generators::one_of](fn.one_of.html) for details.
+    /// Specifies an alternative data generator. See
+    /// [generators::one_of](fn.one_of.html) for details.
     pub fn or<G: Generator<Item = GS::Item> + 'static>(
         self,
         other: G,
     ) -> OneOfGenerator<OneOfSnoc<G, GS>> {
+        self.or_weighted(1, other)
+    }
+    /// Specifies an alternative data generator, with specified weighting. See
+    /// [generators::one_of](fn.one_of.html) for details.
+
+    pub fn or_weighted<G: Generator<Item = GS::Item> + 'static>(
+        self,
+        weight: usize,
+        other: G,
+    ) -> OneOfGenerator<OneOfSnoc<G, GS>> {
         let OneOfGenerator(gs) = self;
         let rs = OneOfSnoc {
+            weight: weight,
             gen: other,
             rest: gs,
         };
@@ -363,13 +392,14 @@ impl<F: Fn() -> G, G: Generator> Generator for LazyGenerator<F> {
 impl<G: Generator, R: OneOfItem<Item = G::Item>> OneOfItem for OneOfSnoc<G, R> {
     type Item = G::Item;
     fn len(&self) -> usize {
-        self.rest.len() + 1
+        self.rest.len() + self.weight
     }
     fn generate_or_delegate<I: InfoSource>(&self, depth: usize, tap: &mut I) -> Maybe<Self::Item> {
-        if depth == 0 {
+        trace!("OneOfSnoc::generate at depth {}", depth);
+        if depth < self.weight {
             self.gen.generate(tap)
         } else {
-            self.rest.generate_or_delegate(depth - 1, tap)
+            self.rest.generate_or_delegate(depth - self.weight, tap)
         }
     }
 }
@@ -377,10 +407,16 @@ impl<G: Generator, R: OneOfItem<Item = G::Item>> OneOfItem for OneOfSnoc<G, R> {
 impl<G: Generator> OneOfItem for OneOfTerm<G> {
     type Item = G::Item;
     fn len(&self) -> usize {
-        1
+        self.weight
     }
     fn generate_or_delegate<I: InfoSource>(&self, depth: usize, tap: &mut I) -> Maybe<Self::Item> {
-        debug_assert_eq!(depth, 0);
+        trace!("OneOfTerm::generate at depth {}", depth);
+        debug_assert!(
+            depth <= self.weight,
+            "depth: {:?} <= terminal weight: {:?}",
+            depth,
+            self.weight
+        );
         self.gen.generate(tap)
     }
 }
@@ -390,6 +426,7 @@ impl<GS: OneOfItem> Generator for OneOfGenerator<GS> {
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
         let v = !u32s().generate(src)?;
         let it = (v as usize * self.0.len()) >> 32;
+        trace!("OneOfGenerator::generate at depth {}", it);
         self.0.generate_or_delegate(it, src)
     }
 }
@@ -650,7 +687,7 @@ pub mod tests {
     }
 
     #[test]
-    fn one_of_should_pick_choices_relativey_evenly() {
+    fn one_of_should_pick_choices_relativley_evenly() {
         env_logger::init().unwrap_or(());
         let gen = one_of(consts(1usize)).or(consts(2)).or(consts(3));
         let trials = 1024usize;
@@ -664,12 +701,53 @@ pub mod tests {
             *samples.entry(val).or_insert(0) += 1;
         }
 
+        println!("Gen: {:?}", gen);
         println!("Histogram: {:?}", samples);
         assert!(
             samples
                 .values()
                 .all(|&val| val >= (expected - allowed_error) && val <= (expected + allowed_error)),
             "Sample counts from {} trials are all ({}+/-{}); got {:?}",
+            trials,
+            expected,
+            allowed_error,
+            samples,
+        );
+    }
+
+    #[test]
+    fn one_of_should_allow_weighting() {
+        env_logger::init().unwrap_or(());
+        let gen = one_of_weighted(30, consts(1u64))
+            .or_weighted(50, consts(2))
+            .or_weighted(20, consts(3));
+        let trials = 1024usize;
+        let allowed_error = trials / 10;
+        let mut samples = BTreeMap::new();
+        let p = unseeded_of_size(1 << 18);
+        let mut t = p.replay();
+        for _ in 0..trials {
+            let val = gen.generate(&mut t).expect("a trial");
+            *samples.entry(val).or_insert(0) += 1;
+        }
+
+        println!("Histogram: {:?}", samples);
+
+        let expected = vec![
+            (1u64, trials * 30 / 100),
+            (2u64, trials * 50 / 100),
+            (3u64, trials * 20 / 100),
+        ].into_iter()
+            .collect::<BTreeMap<_, _>>();
+
+        println!("Expected: {:?}", expected);
+
+        assert!(
+            expected.iter().all(|(key, expected_val)| {
+                let val = samples[&key];
+                val >= (expected_val - allowed_error) && val <= (expected_val + allowed_error)
+            }),
+            "Sample counts from {} trials are all ({:?}+/-{}); got {:?}",
             trials,
             expected,
             allowed_error,
