@@ -139,6 +139,15 @@ where
             });
             trace!("Minpool: {:?}", minpool);
             trace!("Values: {:?}", minpool.replay().draw(&self.gen));
+            // TODO: Return an actual error from `find_minimal` and co, and
+            // use that in message.
+            let res = Self::attempt(
+                &subject,
+                minpool
+                    .replay()
+                    .draw(&self.gen)
+                    .expect("minimal example draw failure"),
+            );
             panic!(
                 "Predicate failed for argument {:?}; check returned {:?}",
                 minpool.replay().draw(&self.gen),
