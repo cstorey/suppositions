@@ -162,7 +162,6 @@ mod tests {
     use env_logger;
     use generators::collections::*;
     use generators::core::tests::*;
-    use generators::core::*;
     use std::collections::LinkedList;
 
     #[test]

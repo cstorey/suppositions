@@ -6,7 +6,7 @@ use std::collections::HashSet;
 /// a sz of (1 << (log2sz-1)) < sz ≤ (1 << log2sz), then where:
 /// f(x) = 1<<(log2sz-x) we want to cut out
 /// chunks of:
-/// ```
+/// ```text
 /// 0..f(0),
 /// 0..f(1), f(1)..2f(1),
 /// 0..f(2), f(2)..2f(2), 2f(2)..3f(2), 3f(2)..4f(2),
