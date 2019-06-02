@@ -43,7 +43,7 @@ fn expr_gen() -> Box<GeneratorObject<Item = Expr>> {
 
 #[test]
 fn add_adds() {
-    env_logger::init().expect("env_logger::init");
+    env_logger::try_init().unwrap_or_default();
     property((expr_gen(), expr_gen())).check(|(a, b)| {
         debug!("Testing: {:?} + {:?}", a, b);
         assert_eq!(a.eval() + b.eval(), (a + b).eval())
