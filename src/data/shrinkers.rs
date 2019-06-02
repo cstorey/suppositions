@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn minimiser_should_minimise_to_minimum_given_size() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         let p = InfoPool::of_vec(vec![1; 4]);
         let min = minimize(&p, &|t| {
             take_n(t, 16).into_iter().filter(|&v| v > 0).count() > 1
@@ -298,7 +298,7 @@ mod tests {
     }
     #[test]
     fn minimiser_should_minimise_scalar_values_to_empty() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         let p = InfoPool::of_vec(vec![255; 3]);
         let min = minimize(&p, &|t| take_n(t, 16).into_iter().any(|_| true));
 
@@ -322,7 +322,7 @@ mod tests {
 
     #[test]
     fn shrink_by_delta_debug_removal_should_produce_somewhat_unique_outputs() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         let p = InfoPool::of_vec((0..256usize).map(|v| v as u8).collect::<Vec<_>>());
         let mut counts = BTreeMap::new();
         for val in RemovalShrinker::delta_debug_of_pool(p) {
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn shrink_by_scalar_should_produce_somewhat_unique_outputs() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         let p = InfoPool::of_vec((0..256usize).map(|v| v as u8).collect::<Vec<_>>());
         let mut counts = BTreeMap::new();
         for val in ScalarShrinker::new(p) {
@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn shrink_by_removal_should_remove_stated_slices() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         let p = InfoPool::of_vec(vec![0, 1, 2, 3, 4]);
         let vals =
             RemovalShrinker::new(p, ::std::iter::once(Span::of_pair((2, 3)))).collect::<Vec<_>>();

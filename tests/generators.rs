@@ -22,7 +22,7 @@ fn i64s_should_generate_same_output_given_same_input() {
 
 #[test]
 fn i64s_should_partially_order_same_as_source() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     let gen = i64s();
     property(
         (info_pools(16), info_pools(16))
@@ -52,7 +52,7 @@ fn f64s_should_generate_same_output_given_same_input() {
 
 #[test]
 fn f64s_should_partially_order_same_as_source() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     let gen = f64s();
     property(
         (info_pools(16), info_pools(16))
@@ -84,7 +84,7 @@ fn uniform_f64s_should_generate_same_output_given_same_input() {
 
 #[test]
 fn uniform_f64s_should_partially_order_same_as_source() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     let gen = uniform_f64s();
     property(
         (info_pools(16), info_pools(16))
@@ -112,7 +112,7 @@ fn weighted_coin_should_generate_same_output_given_same_input() {
 
 #[test]
 fn weighted_coin_should_partially_order_same_as_source() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     let gen = weighted_coin(1.0 / 7.0);
     property(
         (info_pools(16), info_pools(16))
@@ -145,7 +145,7 @@ fn one_of_should_pick_a_single_sample() {
 
 #[test]
 fn one_of_should_partially_order_same_as_source() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     let gen = one_of(consts(1usize)).or(consts(2)).or(consts(3));
     property(
         (info_pools(16), info_pools(16))
@@ -161,7 +161,7 @@ fn one_of_should_partially_order_same_as_source() {
 
 #[test]
 fn boxed_generator_yields_same_as_inner_value() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     let orig = u64s();
     let boxed = u64s().boxed();
     _assert_is_generator(&boxed);
@@ -187,7 +187,7 @@ fn generator_of_3_tuple() {
 
 #[test]
 fn lazy_generator_yields_same_as_inner_value() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     let orig = u64s();
     let lazy = lazy(u64s);
     _assert_is_generator(&lazy);
@@ -203,7 +203,7 @@ fn uptos_never_generates_greater_than_limit<G: Generator + Clone>(g: G)
 where
     G::Item: ScaleInt + Copy + fmt::Debug + PartialOrd,
 {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     property(g.clone().flat_map(|max| {
         let h = uptos(g.clone(), max);
         _assert_is_generator(&h);

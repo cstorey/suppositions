@@ -608,7 +608,7 @@ pub mod tests {
 
     #[test]
     fn bools_minimize_to_false() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         should_minimize_to(booleans(), false)
     }
 
@@ -688,7 +688,7 @@ pub mod tests {
 
     #[test]
     fn one_of_should_pick_choices_relativley_evenly() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         let gen = one_of(consts(1usize)).or(consts(2)).or(consts(3));
         let trials = 1024usize;
         let expected = trials / 3;
@@ -717,7 +717,7 @@ pub mod tests {
 
     #[test]
     fn one_of_should_allow_weighting() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         let gen = one_of_weighted(30, consts(1u64))
             .or_weighted(50, consts(2))
             .or_weighted(20, consts(3));

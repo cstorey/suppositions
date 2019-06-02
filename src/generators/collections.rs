@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn vecs_records_at_least_as_many_leaves_as_elements() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         let nitems = 100;
         let gen = vecs(booleans());
         for _ in 0..nitems {
@@ -224,13 +224,13 @@ mod tests {
 
     #[test]
     fn vec_bools_minimize_to_empty() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         should_minimize_to(vecs(booleans()), vec![])
     }
 
     #[test]
     fn vec_bools_can_minimise_with_predicate() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         should_minimize_to(
             vecs(booleans()).filter(|v| v.len() > 2),
             vec![false, false, false],
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn info_pools_minimize_to_empty() {
-        env_logger::init().unwrap_or(());
+        env_logger::try_init().unwrap_or_default();
         // We force the generator to output a fixed length.
         // This is perhaps not the best idea ever; but it'll do for now.
         should_minimize_to(info_pools(8), InfoPool::of_vec(vec![0; 8]))
@@ -309,7 +309,7 @@ mod tests {
             mean_length_can_be_set_as(23);
         }
         fn mean_length_can_be_set_as(len: usize) {
-            env_logger::init().unwrap_or(());
+            env_logger::try_init().unwrap_or_default();
             let gen = vecs(u8s()).mean_length(len);
             let trials = 1024usize;
             let expected = len as f64;
@@ -368,7 +368,7 @@ mod tests {
             mean_length_can_be_set_as(23);
         }
         fn mean_length_can_be_set_as(len: usize) {
-            env_logger::init().unwrap_or(());
+            env_logger::try_init().unwrap_or_default();
             let gen = collections::<LinkedList<_>, _>(u8s()).mean_length(len);
             let trials = 1024usize;
             let expected = len as f64;

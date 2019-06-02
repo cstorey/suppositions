@@ -76,7 +76,7 @@ fn ops() -> Box<GeneratorObject<Item = Op>> {
 }
 
 fn main() {
-    env_logger::init().expect("env_logger::init");
+    env_logger::try_init().unwrap_or_default();
     CheckConfig::default()
         .num_tests(10000)
         .property(vecs(ops()).mean_length(1000))

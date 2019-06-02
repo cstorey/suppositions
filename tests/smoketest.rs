@@ -19,7 +19,7 @@ fn some_approximation_of_usage() {
 #[test]
 #[should_panic(expected = "Predicate failed for argument ")]
 fn some_approximation_of_failing_example() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     property(vecs(booleans())).check(|l| {
         let rev = l.iter().cloned().rev().take(3).collect::<Vec<_>>();
         let rev2 = rev.into_iter().rev().collect::<Vec<_>>();
@@ -32,7 +32,7 @@ fn some_approximation_of_failing_example() {
 #[test]
 #[should_panic(expected = "Predicate failed for argument ")]
 fn mersenne_conjecture() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     fn is_prime(n: u64) -> bool {
         match n {
             0 | 1 => false,
@@ -54,7 +54,7 @@ fn mersenne_conjecture() {
 #[test]
 #[should_panic(expected = "Predicate failed for argument ")]
 fn trivial_failure() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     property(booleans()).check(|_| false)
 }
 
@@ -117,7 +117,7 @@ This occurs because:
 #[test]
 #[should_panic(expected = "12345")]
 fn panic_includes_minimal_example_padding_error() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     property(u64s()).check(|n| n < 12345);
 }
 
@@ -138,6 +138,6 @@ This occurrs because:
 #[test]
 #[should_panic(expected = "1234567")]
 fn panic_includes_minimal_example_rounding_errors() {
-    env_logger::init().unwrap_or(());
+    env_logger::try_init().unwrap_or_default();
     property(u64s()).check(|n| !((n & 1 == 1) && n >= 1234567));
 }
