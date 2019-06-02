@@ -1,8 +1,8 @@
-use std::iter;
-use std::marker::PhantomData;
 use data::*;
 use generators::core::*;
 use generators::numbers::*;
+use std::iter;
+use std::marker::PhantomData;
 
 /// See [`vecs`](fn.vecs.html)
 #[derive(Debug, Clone)]
@@ -159,11 +159,10 @@ impl<T: Clone> Generator for ChoiceGenerator<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::LinkedList;
     use env_logger;
-    use generators::core::*;
     use generators::collections::*;
     use generators::core::tests::*;
+    use std::collections::LinkedList;
 
     #[test]
     fn vecs_should_generate_same_output_given_same_input() {
@@ -281,8 +280,8 @@ mod tests {
 
     mod vector_lengths {
         use env_logger;
-        use generators::core::tests::*;
         use generators::collections::*;
+        use generators::core::tests::*;
         use std::collections::BTreeMap;
 
         #[test]

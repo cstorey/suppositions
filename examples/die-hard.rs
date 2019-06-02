@@ -3,8 +3,8 @@ extern crate env_logger;
 extern crate log;
 extern crate suppositions;
 use std::cmp::min;
-use suppositions::*;
 use suppositions::generators::*;
+use suppositions::*;
 
 // Run this with:
 // ```

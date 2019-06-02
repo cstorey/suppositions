@@ -1,5 +1,5 @@
-use generators::core::*;
 use data::*;
+use generators::core::*;
 
 macro_rules! tuple_generator_impl {
     ($gen_a:ident: $var_a:ident: $type_a:ident

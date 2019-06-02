@@ -3,8 +3,8 @@ extern crate env_logger;
 extern crate log;
 extern crate suppositions;
 
-use suppositions::*;
 use suppositions::generators::*;
+use suppositions::*;
 
 #[test]
 fn some_approximation_of_usage() {
@@ -47,19 +47,20 @@ fn mersenne_conjecture() {
         let primep = is_prime(n as u64);
         debug!("mersenne_conjecture n: {}; prime? {}", n, primep);
         n < 64 && primep
-    })).check(|n| is_prime((1u64 << n) - 1))
+    }))
+    .check(|n| is_prime((1u64 << n) - 1))
 }
 
 #[test]
 #[should_panic(expected = "Predicate failed for argument ")]
 fn trivial_failure() {
     env_logger::init().unwrap_or(());
-    property((booleans())).check(|_| false)
+    property(booleans()).check(|_| false)
 }
 
 #[test]
 fn trivial_pass() {
-    property((booleans())).check(|_| true)
+    property(booleans()).check(|_| true)
 }
 
 #[test]
@@ -74,30 +75,30 @@ fn value_dependent() {
 #[test]
 #[should_panic(expected = "Predicate failed for argument ")]
 fn trivial_result_failure() {
-    property((booleans())).check(|_| -> Result<(), ()> { Err(()) })
+    property(booleans()).check(|_| -> Result<(), ()> { Err(()) })
 }
 
 #[test]
 #[should_panic(expected = "horrible failure")]
 fn trivial_result_includes_failing_result() {
-    property((booleans())).check(|_| -> Result<(), &'static str> { Err("horrible failure") })
+    property(booleans()).check(|_| -> Result<(), &'static str> { Err("horrible failure") })
 }
 
 #[test]
 fn trivial_result_pass() {
-    property((booleans())).check(|_| -> Result<(), ()> { Ok(()) })
+    property(booleans()).check(|_| -> Result<(), ()> { Ok(()) })
 }
 
 #[test]
 #[should_panic(expected = "Predicate failed for argument ")]
 fn trivial_panic_failure() {
-    property((booleans())).check(|_| -> () { panic!("Big bad boom") })
+    property(booleans()).check(|_| -> () { panic!("Big bad boom") })
 }
 
 #[test]
 #[should_panic(expected = "Big bad boom")]
 fn panic_includes_failure_message() {
-    property((booleans())).check(|_| -> () { panic!("Big bad boom") })
+    property(booleans()).check(|_| -> () { panic!("Big bad boom") })
 }
 
 /*

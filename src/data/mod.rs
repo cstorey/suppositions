@@ -5,7 +5,7 @@
 //!
 //! Also manages the shrinking process (see [`minimize`](fn.minimize.html)).
 
-mod source;
 mod shrinkers;
-pub use self::source::*;
+mod source;
 pub use self::shrinkers::*;
+pub use self::source::*;

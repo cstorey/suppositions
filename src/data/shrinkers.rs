@@ -1,12 +1,12 @@
-use std::cmp::min;
 use data::source::*;
+use std::cmp::min;
 use std::collections::HashSet;
 
 /// Iterates over a series of shrunk pools. If we imagine that our buffer has
 /// a sz of (1 << (log2sz-1)) < sz ≤ (1 << log2sz), then where:
 /// f(x) = 1<<(log2sz-x) we want to cut out
 /// chunks of:
-/// ```
+/// ```text
 /// 0..f(0),
 /// 0..f(1), f(1)..2f(1),
 /// 0..f(2), f(2)..2f(2), 2f(2)..3f(2), 3f(2)..4f(2),
@@ -385,9 +385,10 @@ mod tests {
                 (1, 2),
                 (3, 4),
                 (5, 6),
-            ].into_iter()
-                .map(Span::of_pair)
-                .collect()
+            ]
+            .into_iter()
+            .map(Span::of_pair)
+            .collect()
         );
     }
 

@@ -1,6 +1,6 @@
+use data::*;
 use std::marker::PhantomData;
 use std::mem::size_of;
-use data::*;
 
 use super::core::*;
 
@@ -34,13 +34,12 @@ macro_rules! unsigned_integer_gen {
                 let nbytes = size_of::<$ty>() / size_of::<u8>();
                 let mut val: $ty = 0;
                 for _ in 0..nbytes {
-                    val = val.wrapping_shl(8) | src.draw_u8()
- as $ty;
+                    val = val.wrapping_shl(8) | src.draw_u8() as $ty;
                 }
                 Ok(val)
             }
         }
-    }
+    };
 }
 
 unsigned_integer_gen!(u8s, u8);
@@ -83,7 +82,7 @@ macro_rules! scale_int_impl {
                 res as Self
             }
         }
-    }
+    };
 }
 
 // this is a macro because:
@@ -110,15 +109,15 @@ macro_rules! multiply_limbs_impl {
 
             let (lower, lov) = ll.overflowing_add(lh << half_bits);
             let (lower, lov2) = lower.overflowing_add(hl << half_bits);
-            let upper = hh +
-                if lov { 1 } else { 0 } +
-                if lov2 { 1 } else { 0 } +
-                (lh >> half_bits) +
-                (hl >> half_bits);
+            let upper = hh
+                + if lov { 1 } else { 0 }
+                + if lov2 { 1 } else { 0 }
+                + (lh >> half_bits)
+                + (hl >> half_bits);
 
             (upper, lower)
         }
-    }
+    };
 }
 
 scale_int_impl!(u8, u16);
@@ -166,7 +165,7 @@ macro_rules! signed_integer_gen {
                 }
             }
         }
-    }
+    };
 }
 
 signed_integer_gen!(i8s, u8s(), i8);
@@ -178,8 +177,8 @@ signed_integer_gen!(isizes, usizes(), isize);
 // As with signed types, use the equivalent unsigned generator as an intermediate
 macro_rules! float_gen {
     ($name:ident, $ugen:expr, $ty:ident) => {
-            /// Generates values that encompass all possible float values
-            /// (positive and negative), including NaN, and sub-normal values.
+        /// Generates values that encompass all possible float values
+        /// (positive and negative), including NaN, and sub-normal values.
         pub fn $name() -> FloatGenerator<$ty> {
             FloatGenerator(PhantomData)
         }
@@ -199,7 +198,7 @@ macro_rules! float_gen {
                 }
             }
         }
-    }
+    };
 }
 
 float_gen!(f32s, u32s(), f32);
@@ -222,7 +221,7 @@ macro_rules! uniform_float_gen {
                 return Ok(uval as $ty / $inty::max_value() as $ty);
             }
         }
-    }
+    };
 }
 
 uniform_float_gen!(uniform_f32s, u32s(), u32, f32);
@@ -230,8 +229,8 @@ uniform_float_gen!(uniform_f64s, u64s(), u64, f64);
 
 #[cfg(test)]
 mod tests {
-    use generators::numbers::*;
     use generators::core::tests::*;
+    use generators::numbers::*;
 
     #[test]
     fn u8s_should_generate_same_output_given_same_input() {
@@ -349,8 +348,8 @@ mod tests {
 
     #[test]
     fn prop_multiply_with_carries_works() {
-        use ::*;
         use generators::*;
+        use *;
 
         property((u8s(), u8s())).check(|(a, b)| {
             let product = (a as u16) * (b as u16);
