@@ -3,8 +3,8 @@ extern crate env_logger;
 extern crate log;
 extern crate suppositions;
 
-use suppositions::*;
 use suppositions::generators::*;
+use suppositions::*;
 
 #[test]
 fn some_approximation_of_usage() {
@@ -47,7 +47,8 @@ fn mersenne_conjecture() {
         let primep = is_prime(n as u64);
         debug!("mersenne_conjecture n: {}; prime? {}", n, primep);
         n < 64 && primep
-    })).check(|n| is_prime((1u64 << n) - 1))
+    }))
+    .check(|n| is_prime((1u64 << n) - 1))
 }
 
 #[test]

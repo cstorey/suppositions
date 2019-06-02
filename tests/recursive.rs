@@ -4,8 +4,8 @@ extern crate log;
 extern crate suppositions;
 
 use std::ops::Add;
-use suppositions::*;
 use suppositions::generators::*;
+use suppositions::*;
 
 // Hutton's razor as an example.
 // Demonstrates recursive generators.

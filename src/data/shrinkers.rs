@@ -1,5 +1,5 @@
-use std::cmp::min;
 use data::source::*;
+use std::cmp::min;
 use std::collections::HashSet;
 
 /// Iterates over a series of shrunk pools. If we imagine that our buffer has
@@ -385,9 +385,10 @@ mod tests {
                 (1, 2),
                 (3, 4),
                 (5, 6),
-            ].into_iter()
-                .map(Span::of_pair)
-                .collect()
+            ]
+            .into_iter()
+            .map(Span::of_pair)
+            .collect()
         );
     }
 

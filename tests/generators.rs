@@ -2,10 +2,10 @@ extern crate env_logger;
 extern crate log;
 extern crate suppositions;
 
-use suppositions::*;
-use suppositions::generators::*;
-use suppositions::data::*;
 use std::fmt;
+use suppositions::data::*;
+use suppositions::generators::*;
+use suppositions::*;
 
 fn _assert_is_generator<G: Generator>(_: &G) {}
 
@@ -16,7 +16,8 @@ fn i64s_should_generate_same_output_given_same_input() {
         let v0 = gen.generate_from(&p)?;
         let v1 = gen.generate_from(&p)?;
         Ok((v0, v1))
-    })).check(|(v0, v1)| v0 == v1)
+    }))
+    .check(|(v0, v1)| v0 == v1)
 }
 
 #[test]
@@ -30,7 +31,8 @@ fn i64s_should_partially_order_same_as_source() {
                 gen.generate(&mut p0.replay())
                     .and_then(|v0| gen.generate(&mut p1.replay()).map(|v1| (v0, v1)))
             }),
-    ).check(|(v0, v1)| v0.abs() <= v1.abs())
+    )
+    .check(|(v0, v1)| v0.abs() <= v1.abs())
 }
 
 #[test]
@@ -44,7 +46,8 @@ fn f64s_should_generate_same_output_given_same_input() {
                 Ok((v0, v1))
             })
             .filter(|&(v0, v1)| !(v0.is_nan() || v1.is_nan())),
-    ).check(|(v0, v1)| v0 == v1)
+    )
+    .check(|(v0, v1)| v0 == v1)
 }
 
 #[test]
@@ -60,7 +63,8 @@ fn f64s_should_partially_order_same_as_source() {
                 Ok((v0, v1))
             })
             .filter(|&(v0, v1)| !(v0.is_nan() || v1.is_nan())),
-    ).check(|(v0, v1)| v0.abs() <= v1.abs())
+    )
+    .check(|(v0, v1)| v0.abs() <= v1.abs())
 }
 
 #[test]
@@ -74,7 +78,8 @@ fn uniform_f64s_should_generate_same_output_given_same_input() {
                 Ok((v0, v1))
             })
             .filter(|&(v0, v1)| !(v0.is_nan() || v1.is_nan())),
-    ).check(|(v0, v1)| v0 == v1)
+    )
+    .check(|(v0, v1)| v0 == v1)
 }
 
 #[test]
@@ -90,7 +95,8 @@ fn uniform_f64s_should_partially_order_same_as_source() {
                 Ok((v0, v1))
             })
             .filter(|&(v0, v1)| !(v0.is_nan() || v1.is_nan())),
-    ).check(|(v0, v1)| v0.abs() <= v1.abs())
+    )
+    .check(|(v0, v1)| v0.abs() <= v1.abs())
 }
 
 #[test]
@@ -100,7 +106,8 @@ fn weighted_coin_should_generate_same_output_given_same_input() {
         let v0 = gen.generate_from(&p)?;
         let v1 = gen.generate_from(&p)?;
         Ok((v0, v1))
-    })).check(|(v0, v1)| v0 == v1)
+    }))
+    .check(|(v0, v1)| v0 == v1)
 }
 
 #[test]
@@ -115,7 +122,8 @@ fn weighted_coin_should_partially_order_same_as_source() {
                 let v1 = gen.generate_from(&p1)?;
                 Ok((v0, v1))
             }),
-    ).check(|(v0, v1)| v0 <= v1)
+    )
+    .check(|(v0, v1)| v0 <= v1)
 }
 
 #[test]
@@ -147,7 +155,8 @@ fn one_of_should_partially_order_same_as_source() {
                 let v1 = gen.generate_from(&p1)?;
                 Ok((p0, p1, v0, v1))
             }),
-    ).check(|(_, _, v0, v1)| v0 <= v1)
+    )
+    .check(|(_, _, v0, v1)| v0 <= v1)
 }
 
 #[test]
@@ -160,7 +169,8 @@ fn boxed_generator_yields_same_as_inner_value() {
         let v0 = orig.generate_from(&p)?;
         let v1 = boxed.generate_from(&p)?;
         Ok((v0, v1))
-    })).check(|(v0, v1)| v0 == v1)
+    }))
+    .check(|(v0, v1)| v0 == v1)
 }
 
 #[test]
@@ -185,7 +195,8 @@ fn lazy_generator_yields_same_as_inner_value() {
         let v0 = orig.generate_from(&p)?;
         let v1 = lazy.generate_from(&p)?;
         Ok((v0, v1))
-    })).check(|(v0, v1)| v0 == v1)
+    }))
+    .check(|(v0, v1)| v0 == v1)
 }
 
 fn uptos_never_generates_greater_than_limit<G: Generator + Clone>(g: G)
@@ -197,7 +208,8 @@ where
         let h = uptos(g.clone(), max);
         _assert_is_generator(&h);
         h.map(move |n| (n, max))
-    })).check(|(n, max)| n <= max);
+    }))
+    .check(|(n, max)| n <= max);
 }
 
 #[test]
@@ -257,7 +269,8 @@ fn optional_u64s_should_have_one_region_for_none() {
                 g.generate(&mut ctr).map(|val| (ctr.cnt, val))
             })
             .filter(|&(_, ref val)| val.is_none()),
-    ).check(|(cnt, _)| assert_eq!(1, cnt));
+    )
+    .check(|(cnt, _)| assert_eq!(1, cnt));
 }
 
 #[test]
@@ -274,7 +287,8 @@ fn optional_u64s_should_have_two_regions_for_some() {
                 g.generate(&mut ctr).map(|val| (ctr.cnt, val))
             })
             .filter(|&(_, ref val)| val.is_some()),
-    ).check(|(cnt, _)| assert_eq!(2, cnt));
+    )
+    .check(|(cnt, _)| assert_eq!(2, cnt));
 }
 
 #[test]
@@ -342,7 +356,8 @@ where
     property(info_pools(32).filter_map(|p| {
         let a = g.generate_from(&p)?;
         Ok((p, a))
-    })).check(|(p, a)| -> Result<(), DataError> {
+    }))
+    .check(|(p, a)| -> Result<(), DataError> {
         let lhs = consts(a.clone()).flat_map(f);
         let rhs = f(a);
 

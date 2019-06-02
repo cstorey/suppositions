@@ -444,14 +444,14 @@ pub fn find_minimal<G: Generator, F: Fn(G::Item) -> bool>(
 
 #[cfg(test)]
 pub mod tests {
-    use rand::{random, Rng};
-    use env_logger;
-    use std::iter;
-    use std::fmt;
-    use std::collections::BTreeMap;
     use super::*;
     use data::InfoPool;
+    use env_logger;
     use generators::numbers::*;
+    use rand::{random, Rng};
+    use std::collections::BTreeMap;
+    use std::fmt;
+    use std::iter;
 
     const SHORT_VEC_SIZE: usize = 256;
 
@@ -737,8 +737,9 @@ pub mod tests {
             (1u64, trials * 30 / 100),
             (2u64, trials * 50 / 100),
             (3u64, trials * 20 / 100),
-        ].into_iter()
-            .collect::<BTreeMap<_, _>>();
+        ]
+        .into_iter()
+        .collect::<BTreeMap<_, _>>();
 
         println!("Expected: {:?}", expected);
 

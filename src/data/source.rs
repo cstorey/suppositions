@@ -1,7 +1,7 @@
-use std::fmt;
-use std::iter;
 use hex_slice::AsHex;
 use rand::{random, Rng, XorShiftRng};
+use std::fmt;
+use std::iter;
 
 /// Something that can extract information from an `InfoSource`.
 pub trait InfoSink {
@@ -516,7 +516,8 @@ mod tests {
             v0
         }));
 
-        let actual = p.spans_iter()
+        let actual = p
+            .spans_iter()
             .map(|span| buf[span.range()].to_vec())
             .collect::<Vec<_>>();
         assert_eq!(actual, vec![v0]);
