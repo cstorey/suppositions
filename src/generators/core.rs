@@ -448,7 +448,8 @@ pub mod tests {
     use data::InfoPool;
     use env_logger;
     use generators::numbers::*;
-    use rand::{random, Rng};
+    use rand::{random, Rng, SeedableRng};
+    use rand_xorshift::XorShiftRng;
     use std::collections::BTreeMap;
     use std::fmt;
     use std::iter;
@@ -462,7 +463,7 @@ pub mod tests {
     /// Create an `InfoPool` with a `size` length vector of random bytes
     /// using the generator `rng`. (Mostly used for testing).
     pub fn unseeded_of_size(size: usize) -> InfoPool {
-        let mut rng = ::rand::XorShiftRng::new_unseeded();
+        let mut rng = XorShiftRng::from_seed(Default::default());
         InfoPool::of_vec((0..size).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>())
     }
 
@@ -653,7 +654,7 @@ pub mod tests {
         let gen = weighted_coin(1.0 / 3.0);
         let trials = 256;
         let expected = trials / 3;
-        let allowed_error = trials / 32;
+        let allowed_error = trials / 16;
         let mut heads = 0;
         let mut t = p.replay();
         for _ in 0..trials {

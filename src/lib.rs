@@ -46,6 +46,7 @@ extern crate hex_slice;
 #[macro_use]
 extern crate log;
 extern crate rand;
+extern crate rand_xorshift;
 
 pub mod data;
 pub mod generators;
