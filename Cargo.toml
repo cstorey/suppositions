@@ -9,7 +9,7 @@ description = "Property testing with automagic shrinking."
 readme = "README.md"
 
 [dependencies]
-log = "0.3.8"
+log = "0.4.6"
 rand = "0.3.16"
 hex-slice = "0.1.0"
 [dev-dependencies]
