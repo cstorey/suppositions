@@ -458,7 +458,7 @@ pub mod tests {
     const SHORT_VEC_SIZE: usize = 256;
 
     fn gen_random_vec() -> Vec<u8> {
-        let mut osrng = OsRng::new().expect("os rng");
+        let mut osrng = OsRng;
         (0..SHORT_VEC_SIZE)
             .map(|_| osrng.next_u32() as u8)
             .collect::<Vec<u8>>()

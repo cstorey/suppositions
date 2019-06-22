@@ -113,7 +113,7 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
 impl RngSource<XorShiftRng> {
     /// Creates a RngSource with a randomly seeded XorShift generator.
     pub fn new() -> Self {
-        let mut osrng = OsRng::new().expect("os rng");
+        let mut osrng = OsRng;
         let rng = XorShiftRng::seed_from_u64(osrng.next_u64());
         RngSource { rng }
     }
