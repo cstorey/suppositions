@@ -1,5 +1,6 @@
 use hex_slice::AsHex;
-use rand::{random, Rng, SeedableRng};
+use rand_core::{RngCore, SeedableRng};
+use rand_os::OsRng;
 use rand_xorshift::XorShiftRng;
 use std::fmt;
 use std::iter;
@@ -112,14 +113,15 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
 impl RngSource<XorShiftRng> {
     /// Creates a RngSource with a randomly seeded XorShift generator.
     pub fn new() -> Self {
-        let rng = XorShiftRng::from_seed(random());
+        let mut osrng = OsRng::new().expect("os rng");
+        let rng = XorShiftRng::seed_from_u64(osrng.next_u64());
         RngSource { rng }
     }
 }
 
-impl<R: Rng> InfoSource for RngSource<R> {
+impl<R: RngCore> InfoSource for RngSource<R> {
     fn draw_u8(&mut self) -> u8 {
-        self.rng.gen::<u8>()
+        self.rng.next_u32() as u8
     }
     fn draw<S: InfoSink>(&mut self, mut sink: S) -> S::Out
     where
@@ -264,7 +266,7 @@ mod tests {
     extern crate env_logger;
     use super::*;
     use std::collections::BTreeSet;
-    impl<R: Rng> RngSource<R> {
+    impl<R: RngCore> RngSource<R> {
         pub(crate) fn of(rng: R) -> Self {
             RngSource { rng }
         }
