@@ -448,7 +448,8 @@ pub mod tests {
     use data::InfoPool;
     use env_logger;
     use generators::numbers::*;
-    use rand::{random, Rng, SeedableRng};
+    use rand_core::{RngCore, SeedableRng};
+    use rand_os::OsRng;
     use rand_xorshift::XorShiftRng;
     use std::collections::BTreeMap;
     use std::fmt;
@@ -457,14 +458,17 @@ pub mod tests {
     const SHORT_VEC_SIZE: usize = 256;
 
     fn gen_random_vec() -> Vec<u8> {
-        (0..SHORT_VEC_SIZE).map(|_| random()).collect::<Vec<u8>>()
+        let mut osrng = OsRng::new().expect("os rng");
+        (0..SHORT_VEC_SIZE)
+            .map(|_| osrng.next_u32() as u8)
+            .collect::<Vec<u8>>()
     }
 
     /// Create an `InfoPool` with a `size` length vector of random bytes
     /// using the generator `rng`. (Mostly used for testing).
     pub fn unseeded_of_size(size: usize) -> InfoPool {
         let mut rng = XorShiftRng::from_seed(Default::default());
-        InfoPool::of_vec((0..size).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>())
+        InfoPool::of_vec((0..size).map(|_| rng.next_u32() as u8).collect::<Vec<u8>>())
     }
 
     pub fn should_generate_same_output_given_same_input<G: Generator>(gen: G)
