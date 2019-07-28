@@ -237,6 +237,37 @@ fn uptos_u64_never_generates_greater_than_limit() {
     uptos_never_generates_greater_than_limit(u64s())
 }
 
+#[test]
+fn u64s_has_upto_sugar() {
+    let g = u64s();
+
+    env_logger::try_init().unwrap_or_default();
+    property(g.clone().flat_map(|max| {
+        let h = g.clone().upto(max);
+        _assert_is_generator(&h);
+        h.map(move |n| (n, max))
+    }))
+    .check(|(n, max)| n <= max);
+}
+
+#[test]
+fn u64s_has_between_sugar() {
+    let g = u64s();
+
+    env_logger::try_init().unwrap_or_default();
+    property(
+        (g.clone(), g.clone())
+            .map(|(a, b)| if a > b { (b, a) } else { (a, b) })
+            .flat_map(|(min, max)| {
+                assert!(min <= max);
+                let h = g.clone().between(min, max);
+                _assert_is_generator(&h);
+                h.map(move |n| (n, min, max))
+            }),
+    )
+    .check(|(n, min, max)| min <= n && n <= max);
+}
+
 struct RegionCounter<S> {
     src: S,
     cnt: usize,

@@ -1,6 +1,7 @@
 use data::*;
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::ops;
 
 use super::core::*;
 
@@ -19,6 +20,27 @@ pub struct UniformFloatGenerator<N>(PhantomData<N>);
 /// See [`uptos`](fn.uptos.html)
 #[derive(Debug, Clone)]
 pub struct UptoGenerator<G: Generator>(G, G::Item);
+
+impl<T, N: Copy + ScaleInt> IntGenerator<T>
+where
+    IntGenerator<T>: Generator<Item = N>,
+{
+    /// Scales the output of g generating an unsigned integer up to max. See also [`uptos`](fn.uptos.html)
+    pub fn upto(self, max: N) -> impl Generator<Item = N> {
+        uptos(self, max)
+    }
+}
+
+impl<T, N: Copy + ScaleInt + ops::Sub<N, Output = N> + ops::Add<N, Output = N>> IntGenerator<T>
+where
+    IntGenerator<T>: Generator<Item = N>,
+{
+    /// Yields a value beween min and max, inclusive of both.
+    pub fn between(self, min: N, max: N) -> impl Generator<Item = N> {
+        let diff = max - min;
+        uptos(self, diff).map(move |x| x + min)
+    }
+}
 
 macro_rules! unsigned_integer_gen {
     ($name:ident, $ty:ty) => {
