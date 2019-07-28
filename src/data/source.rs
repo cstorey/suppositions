@@ -562,4 +562,12 @@ mod tests {
             spans
         );
     }
+
+    #[test]
+    fn info_source_object_safety() {
+        let mut p = InfoRecorder::new(RngSource::new());
+        let obj: &mut InfoSource = &mut p;
+
+        let _ = obj.draw_u8();
+    }
 }
