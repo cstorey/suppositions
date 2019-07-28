@@ -253,6 +253,11 @@ impl<G: InfoSource> InfoSource for RegionCounter<G> {
         self.cnt += 1;
         self.src.draw(sink)
     }
+
+    fn range(&mut self, f: &mut FnMut(&mut InfoSource)) {
+        f(self);
+        unimplemented!("RegionCounter::range");
+    }
 }
 
 #[test]

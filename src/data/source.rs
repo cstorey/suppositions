@@ -17,6 +17,8 @@ pub trait InfoSink {
 pub trait InfoSource {
     /// Take a single byte from the source.
     fn draw_u8(&mut self) -> u8;
+    /// TODO: Does this even work?
+    fn range(&mut self, &mut FnMut(&mut InfoSource));
 
     /// Call F with access to the data source.
     fn draw<S: InfoSink>(&mut self, sink: S) -> S::Out
@@ -57,6 +59,11 @@ impl<'a, I: InfoSource + ?Sized> InfoSource for &'a mut I {
         Self: Sized,
     {
         sink.sink(self)
+    }
+
+    fn range(&mut self, f: &mut FnMut(&mut InfoSource)) {
+        f(self);
+        unimplemented!("&'a mut <I:InfoSource>::range");
     }
 }
 
@@ -106,7 +113,25 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
         debug!("Span: {:?}", (start, end));
         self.level = level;
         self.spans.push(Span { start, end, level });
+
+        if false {
+            unimplemented!("replace with range")
+        };
+
         res
+    }
+
+    fn range(&mut self, f: &mut FnMut(&mut InfoSource)) {
+        let start = self.data.len();
+        let level = self.level;
+        self.level += 1;
+        trace!("-> InfoRecorder::draw @{}", start);
+        f(self);
+        let end = self.data.len();
+        trace!("<- InfoRecorder::draw @{}", end);
+        debug!("Span: {:?}", (start, end));
+        self.level = level;
+        self.spans.push(Span { start, end, level });
     }
 }
 
@@ -128,6 +153,11 @@ impl<R: RngCore> InfoSource for RngSource<R> {
         Self: Sized,
     {
         sink.sink(self)
+    }
+
+    fn range(&mut self, f: &mut FnMut(&mut InfoSource)) {
+        f(self);
+        unimplemented!("RngSource::range");
     }
 }
 
@@ -225,6 +255,11 @@ impl<'a> InfoSource for InfoReplay<'a> {
         Self: Sized,
     {
         sink.sink(self)
+    }
+
+    fn range(&mut self, f: &mut FnMut(&mut InfoSource)) {
+        f(self);
+        unimplemented!("InfoReplay::range");
     }
 }
 impl Iterator for InfoPoolIntervalsIter {
