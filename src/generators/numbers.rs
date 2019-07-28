@@ -20,6 +20,16 @@ pub struct UniformFloatGenerator<N>(PhantomData<N>);
 #[derive(Debug, Clone)]
 pub struct UptoGenerator<G: Generator>(G, G::Item);
 
+impl<T, N: Copy + ScaleInt> IntGenerator<T>
+where
+    IntGenerator<T>: Generator<Item = N>,
+{
+    /// Scales the output of g generating an unsigned integer up to max. See also [`uptos`](fn.uptos.html)
+    pub fn upto(self, max: N) -> impl Generator<Item = N> {
+        uptos(self, max)
+    }
+}
+
 macro_rules! unsigned_integer_gen {
     ($name:ident, $ty:ty) => {
         /// A generator that generates integers of the specified type.
