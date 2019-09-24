@@ -1,7 +1,6 @@
 use hex_slice::AsHex;
-use rand_core::{RngCore, SeedableRng};
-use rand_os::OsRng;
-use rand_xorshift::XorShiftRng;
+use rand::rngs::{OsRng, StdRng};
+use rand::{RngCore, SeedableRng};
 use std::fmt;
 use std::iter;
 
@@ -110,11 +109,11 @@ impl<I: InfoSource> InfoSource for InfoRecorder<I> {
     }
 }
 
-impl RngSource<XorShiftRng> {
+impl RngSource<StdRng> {
     /// Creates a RngSource with a randomly seeded XorShift generator.
     pub fn new() -> Self {
         let mut osrng = OsRng;
-        let rng = XorShiftRng::seed_from_u64(osrng.next_u64());
+        let rng = StdRng::seed_from_u64(osrng.next_u64());
         RngSource { rng }
     }
 }
@@ -295,7 +294,7 @@ mod tests {
     fn should_generate_random_data() {
         let trials = 1024usize;
         let mut vals = 0;
-        let mut p = RngSource::of(XorShiftRng::from_seed(Default::default()));
+        let mut p = RngSource::of(StdRng::from_seed(Default::default()));
         let error = 8;
         for _ in 0..trials {
             vals += p.draw_u8() as usize;

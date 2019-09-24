@@ -45,9 +45,7 @@ extern crate env_logger;
 extern crate hex_slice;
 #[macro_use]
 extern crate log;
-extern crate rand_core;
-extern crate rand_os;
-extern crate rand_xorshift;
+extern crate rand;
 
 pub mod data;
 pub mod generators;
