@@ -273,10 +273,10 @@ mod tests {
     }
 
     struct FnSink<F>(F);
-    impl<F: FnMut(&mut InfoSource) -> R, R> InfoSink for FnSink<F> {
+    impl<F: FnMut(&mut dyn InfoSource) -> R, R> InfoSink for FnSink<F> {
         type Out = R;
         fn sink<I: InfoSource>(&mut self, k: &mut I) -> R {
-            (self.0)(k as &mut InfoSource)
+            (self.0)(k as &mut dyn InfoSource)
         }
     }
 
@@ -336,7 +336,7 @@ mod tests {
     fn should_allow_restarting_child_reads() {
         let mut p = InfoRecorder::new(RngSource::new());
         let mut v0 = Vec::new();
-        p.draw(FnSink(|src: &mut InfoSource| {
+        p.draw(FnSink(|src: &mut dyn InfoSource| {
             for _ in 0..4 {
                 let x: u8 = src.draw_u8();
                 v0.push(x);
@@ -363,7 +363,7 @@ mod tests {
             v0.push(x);
         }
 
-        p.draw(FnSink(|src: &mut InfoSource| {
+        p.draw(FnSink(|src: &mut dyn InfoSource| {
             for _ in 0..4 {
                 let x: u8 = src.draw_u8();
                 v0.push(x);
@@ -395,7 +395,7 @@ mod tests {
             v0.push(x);
         }
 
-        p.draw(FnSink(|src: &mut InfoSource| {
+        p.draw(FnSink(|src: &mut dyn InfoSource| {
             for _ in 0..4 {
                 let x: u8 = src.draw_u8();
                 v0.push(x);
@@ -424,7 +424,7 @@ mod tests {
     fn tap_can_act_as_source() {
         let buf = vec![4, 3, 2, 1];
         let p = InfoPool::of_vec(buf.clone());
-        let _: &InfoSource = &p.replay();
+        let _: &dyn InfoSource = &p.replay();
         let mut res = Vec::new();
         let mut it = p.replay();
         for _ in 0..4 {
@@ -461,7 +461,7 @@ mod tests {
     #[test]
     fn info_recorder_should_record_child_reads() {
         let mut p = InfoRecorder::new(RngSource::new());
-        p.draw(FnSink(|src: &mut InfoSource| {
+        p.draw(FnSink(|src: &mut dyn InfoSource| {
             for _ in 0..4 {
                 let _ = src.draw_u8();
             }
@@ -483,7 +483,7 @@ mod tests {
             v0.push(x);
         }
 
-        p.draw(FnSink(|src: &mut InfoSource| {
+        p.draw(FnSink(|src: &mut dyn InfoSource| {
             for _ in 0..4 {
                 let x: u8 = src.draw_u8();
                 v0.push(x);
@@ -510,7 +510,7 @@ mod tests {
             let _ = p.draw_u8();
         }
 
-        let v0 = p.draw(FnSink(|src: &mut InfoSource| {
+        let v0 = p.draw(FnSink(|src: &mut dyn InfoSource| {
             let mut v0 = Vec::new();
             for _ in 0..4 {
                 let x: u8 = src.draw_u8();
@@ -535,7 +535,7 @@ mod tests {
             fn sink<I: InfoSource>(&mut self, src: &mut I) -> Self::Out {
                 let mut out = Vec::new();
                 for _ in 0..4 {
-                    let v = src.draw(FnSink(|src: &mut InfoSource| {
+                    let v = src.draw(FnSink(|src: &mut dyn InfoSource| {
                         let v0 = src.draw_u8() as u16;
                         let v1 = src.draw_u8() as u16;
                         (v1 << 8) | v0

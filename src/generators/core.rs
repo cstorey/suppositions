@@ -139,7 +139,7 @@ pub trait GeneratorObject {
     type Item;
     /// This consumes a stream of bytes given by `source`, and generates a
     /// value of type `Self::Item`.
-    fn generate_obj(&self, src: &mut InfoSource) -> Maybe<Self::Item>;
+    fn generate_obj(&self, src: &mut dyn InfoSource) -> Maybe<Self::Item>;
 }
 
 /// An extension trait that allows use of methods that assume Self has a known
@@ -149,7 +149,7 @@ pub trait GeneratorSized {
     type Item;
     /// Returns a boxed trait object. Useful for returning a series of chained
     /// combinators without having to declare the full type.
-    fn boxed(self) -> Box<GeneratorObject<Item = Self::Item>>;
+    fn boxed(self) -> Box<dyn GeneratorObject<Item = Self::Item>>;
 }
 
 impl<G> GeneratorSized for G
@@ -157,22 +157,22 @@ where
     G: Generator + 'static,
 {
     type Item = G::Item;
-    fn boxed(self) -> Box<GeneratorObject<Item = Self::Item>> {
+    fn boxed(self) -> Box<dyn GeneratorObject<Item = Self::Item>> {
         Box::new(self)
     }
 }
 
 impl<G: Generator> GeneratorObject for G {
     type Item = G::Item;
-    fn generate_obj(&self, mut src: &mut InfoSource) -> Maybe<Self::Item> {
+    fn generate_obj(&self, mut src: &mut dyn InfoSource) -> Maybe<Self::Item> {
         (*self).generate(&mut src)
     }
 }
 
-impl<T> Generator for Box<GeneratorObject<Item = T>> {
+impl<T> Generator for Box<dyn GeneratorObject<Item = T>> {
     type Item = T;
     fn generate<I: InfoSource>(&self, src: &mut I) -> Maybe<Self::Item> {
-        (**self).generate_obj(src as &mut InfoSource)
+        (**self).generate_obj(src as &mut dyn InfoSource)
     }
 }
 
