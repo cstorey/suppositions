@@ -448,3 +448,16 @@ fn flat_map_should_be_associative<
         Ok(())
     });
 }
+
+#[test]
+fn should_allow_generation_from_function() {
+    let gen = generator_fn(|src: &mut dyn InfoSource| {
+        let val = u32s().generate_obj(src)?;
+        Ok(val)
+    });
+
+    property(info_pools(32)).check(|p| {
+        let result = gen.generate_from(&p);
+        assert!(result.is_ok(), "Result: {:?}", result);
+    });
+}
