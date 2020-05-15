@@ -2,11 +2,13 @@
 //! in the [`suppositions::data`](../data/index.html) module.
 
 mod collections;
+mod composition;
 mod core;
 mod numbers;
 mod tuples;
 
 pub use self::collections::*;
+pub use self::composition::*;
 pub use self::core::*;
 pub use self::numbers::*;
 pub use self::tuples::*;
