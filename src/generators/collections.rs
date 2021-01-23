@@ -201,6 +201,12 @@ mod tests {
             debug!("<- Tracer::draw");
             res
         }
+
+        /// Does this even work?
+        fn range(&mut self, f: &mut FnMut(&mut InfoSource)) {
+            f(self);
+            unimplemented!("Tracer::range");
+        }
     }
 
     #[test]
